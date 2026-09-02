@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsObject, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+} from 'class-validator';
+import { DocumentFormat } from '../domain/document-loader';
 
 /** Request payload used to ingest a document into the retrieval index. */
 export class IngestDocumentDto {
@@ -17,6 +27,11 @@ export class IngestDocumentDto {
   @IsString()
   @MinLength(1)
   content!: string;
+
+  @ApiPropertyOptional({ enum: ['text', 'markdown', 'html'], default: 'text' })
+  @IsOptional()
+  @IsIn(['text', 'markdown', 'html'])
+  format?: DocumentFormat;
 
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsOptional()

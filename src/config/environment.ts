@@ -5,6 +5,7 @@ export interface EnvironmentVariables {
   OPENAI_CHAT_MODEL?: string;
   RAG_CHUNK_SIZE?: string;
   RAG_CHUNK_OVERLAP?: string;
+  RAG_CHUNK_MAX_TOKENS?: string;
   RAG_TOP_K?: string;
   RAG_MAX_CONTEXT_CHARS?: string;
   RAG_CANDIDATE_MULTIPLIER?: string;
@@ -24,6 +25,7 @@ export function validateEnvironment(
   const positiveIntegerKeys = [
     'PORT',
     'RAG_CHUNK_SIZE',
+    'RAG_CHUNK_MAX_TOKENS',
     'RAG_TOP_K',
     'RAG_MAX_CONTEXT_CHARS',
   ] as const;

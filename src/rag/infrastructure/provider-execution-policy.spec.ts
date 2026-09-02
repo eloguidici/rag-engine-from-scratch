@@ -46,4 +46,23 @@ describe('ProviderExecutionPolicy', () => {
       policy.execute(() => new Promise<string>(() => undefined)),
     ).rejects.toThrow('Provider request timed out after 5ms');
   });
+
+  it('opens the circuit after consecutive failures', async () => {
+    const policy = new ProviderExecutionPolicy(
+      new ConfigService({
+        PROVIDER_TIMEOUT_MS: '1000',
+        PROVIDER_MAX_RETRIES: '0',
+        PROVIDER_CIRCUIT_FAILURE_THRESHOLD: '2',
+        PROVIDER_CIRCUIT_RESET_MS: '10000',
+      }),
+    );
+    const operation = jest
+      .fn<Promise<string>, []>()
+      .mockRejectedValue(Object.assign(new Error('unavailable'), { status: 503 }));
+
+    await expect(policy.execute(operation)).rejects.toThrow('unavailable');
+    await expect(policy.execute(operation)).rejects.toThrow('unavailable');
+    await expect(policy.execute(operation)).rejects.toThrow('Provider circuit is open');
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
 });

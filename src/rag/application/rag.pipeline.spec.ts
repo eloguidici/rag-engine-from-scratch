@@ -5,6 +5,7 @@ import {
   MarkdownDocumentLoader,
   PlainTextDocumentLoader,
 } from '../infrastructure/document-loaders';
+import { InMemoryDocumentRevisionRepository } from '../infrastructure/in-memory-document-revision.repository';
 import { InMemoryVectorStore } from '../infrastructure/in-memory-vector-store';
 import { RecursiveChunkingStrategy } from '../infrastructure/recursive-chunking.strategy';
 import { WeightedHybridScoringStrategy } from '../infrastructure/weighted-hybrid-scoring.strategy';
@@ -63,7 +64,7 @@ describe('RAG pipeline', () => {
       retrieval,
       new ContextBuilderService(),
       ingestion,
-      new DocumentRevisionService(),
+      new DocumentRevisionService(new InMemoryDocumentRevisionRepository()),
       config,
       embeddings,
       store,

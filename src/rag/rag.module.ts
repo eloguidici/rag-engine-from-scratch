@@ -43,6 +43,7 @@ import {
 import { PostgresDocumentRevisionRepository } from './infrastructure/postgres-document-revision.repository';
 import { POSTGRES_POOL } from './infrastructure/postgres.tokens';
 import { PostgresVectorStore } from './infrastructure/postgres-vector-store';
+import { ProviderExecutionPolicy } from './infrastructure/provider-execution-policy';
 import { ReciprocalRankFusionStrategy } from './infrastructure/reciprocal-rank-fusion.strategy';
 import { RecursiveChunkingStrategy } from './infrastructure/recursive-chunking.strategy';
 import { UploadedDocumentExtractor } from './infrastructure/uploaded-document.extractor';
@@ -61,6 +62,7 @@ const queryHandlers = [AskRagHandler];
     TextChunkerService,
     DocumentIngestionService,
     DocumentRevisionService,
+    ProviderExecutionPolicy,
     PlainTextDocumentLoader,
     MarkdownDocumentLoader,
     HtmlDocumentLoader,

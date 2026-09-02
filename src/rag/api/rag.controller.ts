@@ -26,6 +26,6 @@ export class RagController {
   @Post('query')
   @ApiOperation({ summary: 'Ask a question against indexed documents' })
   query(@Body() dto: QueryRagDto) {
-    return this.queryBus.execute(new AskRagQuery(dto.question, dto.topK));
+    return this.queryBus.execute(new AskRagQuery(dto.question, dto.topK, dto.filters));
   }
 }

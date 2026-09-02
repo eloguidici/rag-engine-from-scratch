@@ -30,4 +30,8 @@ export class DocumentRevisionService {
   commit(documentId: string, contentHash: string, version: number): void {
     this.revisions.set(documentId, { contentHash, version });
   }
+
+  remove(documentId: string): void {
+    this.revisions.delete(documentId);
+  }
 }

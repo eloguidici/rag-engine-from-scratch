@@ -1,8 +1,14 @@
 export interface EnvironmentVariables {
   PORT?: string;
-  OPENAI_API_KEY: string;
+  MODEL_PROVIDER?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_BASE_URL?: string;
   OPENAI_EMBEDDING_MODEL?: string;
   OPENAI_CHAT_MODEL?: string;
+  PROVIDER_TIMEOUT_MS?: string;
+  PROVIDER_MAX_RETRIES?: string;
+  PROVIDER_RETRY_BASE_MS?: string;
+  EMBEDDING_BATCH_SIZE?: string;
   RAG_CHUNK_SIZE?: string;
   RAG_CHUNK_OVERLAP?: string;
   RAG_CHUNK_MAX_TOKENS?: string;
@@ -19,14 +25,25 @@ export interface EnvironmentVariables {
 export function validateEnvironment(
   config: Record<string, unknown>,
 ): EnvironmentVariables {
-  const rawApiKey = config.OPENAI_API_KEY;
-  const openAiApiKey = typeof rawApiKey === 'string' ? rawApiKey.trim() : '';
-  if (!openAiApiKey) {
-    throw new Error('OPENAI_API_KEY is required');
+  const provider = optionalString(config.MODEL_PROVIDER) ?? 'openai';
+  if (provider !== 'openai' && provider !== 'openai-compatible') {
+    throw new Error('MODEL_PROVIDER must be openai or openai-compatible');
+  }
+
+  const openAiApiKey = optionalString(config.OPENAI_API_KEY)?.trim();
+  const baseUrl = optionalString(config.OPENAI_BASE_URL)?.trim();
+  if (provider === 'openai' && !openAiApiKey) {
+    throw new Error('OPENAI_API_KEY is required when MODEL_PROVIDER=openai');
+  }
+  if (provider === 'openai-compatible' && !baseUrl) {
+    throw new Error('OPENAI_BASE_URL is required when MODEL_PROVIDER=openai-compatible');
   }
 
   const positiveIntegerKeys = [
     'PORT',
+    'PROVIDER_TIMEOUT_MS',
+    'PROVIDER_RETRY_BASE_MS',
+    'EMBEDDING_BATCH_SIZE',
     'RAG_CHUNK_SIZE',
     'RAG_CHUNK_MAX_TOKENS',
     'RAG_TOP_K',
@@ -38,6 +55,13 @@ export function validateEnvironment(
     const value = config[key];
     if (value !== undefined && (!Number.isInteger(Number(value)) || Number(value) <= 0)) {
       throw new Error(`${key} must be a positive integer`);
+    }
+  }
+
+  if (config.PROVIDER_MAX_RETRIES !== undefined) {
+    const retries = Number(config.PROVIDER_MAX_RETRIES);
+    if (!Number.isInteger(retries) || retries < 0) {
+      throw new Error('PROVIDER_MAX_RETRIES must be a non-negative integer');
     }
   }
 
@@ -74,9 +98,15 @@ export function validateEnvironment(
 
   return {
     PORT: optionalString(config.PORT),
+    MODEL_PROVIDER: provider,
     OPENAI_API_KEY: openAiApiKey,
+    OPENAI_BASE_URL: baseUrl,
     OPENAI_EMBEDDING_MODEL: optionalString(config.OPENAI_EMBEDDING_MODEL),
     OPENAI_CHAT_MODEL: optionalString(config.OPENAI_CHAT_MODEL),
+    PROVIDER_TIMEOUT_MS: optionalString(config.PROVIDER_TIMEOUT_MS),
+    PROVIDER_MAX_RETRIES: optionalString(config.PROVIDER_MAX_RETRIES),
+    PROVIDER_RETRY_BASE_MS: optionalString(config.PROVIDER_RETRY_BASE_MS),
+    EMBEDDING_BATCH_SIZE: optionalString(config.EMBEDDING_BATCH_SIZE),
     RAG_CHUNK_SIZE: optionalString(config.RAG_CHUNK_SIZE),
     RAG_CHUNK_OVERLAP: optionalString(config.RAG_CHUNK_OVERLAP),
     RAG_CHUNK_MAX_TOKENS: optionalString(config.RAG_CHUNK_MAX_TOKENS),

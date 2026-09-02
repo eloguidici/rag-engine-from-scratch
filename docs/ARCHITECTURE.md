@@ -6,10 +6,10 @@ This project implements a Retrieval-Augmented Generation pipeline while keeping 
 
 The architecture is organized around four layers:
 
-- **API**: transport concerns, validation, Swagger contracts, and CQRS dispatch.
-- **Application**: use-case orchestration, commands, queries, handlers, and retrieval flow.
-- **Domain**: stable models, ports, and strategy contracts.
-- **Infrastructure**: vendor SDKs, vector storage, and concrete ranking implementations.
+- **API**: HTTP transport, validation, Swagger contracts, multipart upload, and CQRS dispatch.
+- **Application**: use-case orchestration, document lifecycle, commands, queries, handlers, and retrieval flow.
+- **Domain**: stable models, provider ports, and strategy contracts.
+- **Infrastructure**: OpenAI adapters, vector storage, document extraction, chunking, BM25, RRF, and reranking implementations.
 
 ## Dependency direction
 
@@ -23,76 +23,123 @@ Domain
 Infrastructure
 ```
 
-The domain does not depend on NestJS-specific infrastructure adapters or external AI SDKs. External providers implement domain-defined ports.
+Infrastructure implements contracts defined toward the domain/application boundary. External provider details do not leak into use-case orchestration.
+
+## Document ingestion boundary
+
+Documents can enter through JSON content or multipart file upload.
+
+```text
+Inline content ───────────────┐
+                             ├─> normalization -> revision hash -> chunking -> embeddings -> VectorStore
+TXT / MD / HTML upload ──────┤
+PDF upload -> text extraction ┘
+```
+
+`DocumentFileExtractor` owns binary extraction and MIME-specific behavior. `DocumentLoader` implementations normalize text, Markdown, and HTML. This keeps file transport and parser concerns outside `RagService`.
+
+A SHA-256 hash of normalized content drives duplicate detection and revisioning. Stable document ids support safe reindexing: unchanged content is skipped; changed content increments the version and replaces previous chunks.
 
 ## CQRS boundary
 
-Document ingestion mutates the retrieval index and is modeled as a command:
+Index mutations are commands:
 
 ```text
-IngestDocumentCommand → IngestDocumentHandler → RagService.ingest()
+IngestDocumentCommand -> IngestDocumentHandler -> RagService.ingest()
+DeleteDocumentCommand -> DeleteDocumentHandler -> RagService.deleteDocument()
 ```
 
-Question answering is read-only and is modeled as a query:
+Question answering is read-only:
 
 ```text
-AskRagQuery → AskRagHandler → RagService.query()
+AskRagQuery -> AskRagHandler -> RagService.query()
 ```
 
 CQRS is intentionally limited to operations where the read/write distinction is meaningful.
 
-## Ports
+## Ports and strategies
 
-The application depends on three primary provider contracts:
+The system isolates the main change axes behind explicit contracts:
 
 - `EmbeddingProvider`
-- `VectorStore`
 - `GenerationProvider`
+- `VectorStore`
+- `DocumentFileExtractor`
+- `ChunkingStrategy`
+- `RetrievalScoringStrategy`
+- `RetrievalFusionStrategy`
+- `Reranker`
 
-This makes provider replacement local to dependency registration.
-
-## Retrieval Strategy
-
-`RetrievalService` coordinates retrieval but does not own ranking policy. Ranking is delegated to `RetrievalScoringStrategy`.
-
-The default implementation, `WeightedHybridScoringStrategy`, combines semantic similarity and lexical evidence.
-
-This separation allows future implementations such as:
-
-- Reciprocal Rank Fusion
-- BM25 + vector fusion
-- learned rerankers
-- domain-specific weighting
-
-without changing retrieval orchestration.
+This keeps provider, storage, ingestion, and ranking replacement local to dependency registration.
 
 ## Chunking
 
-`TextChunkerService` currently uses character-based overlapping chunks with boundary preference for sentence or whitespace endings.
+`TextChunkerService` delegates to `ChunkingStrategy`.
 
-This is intentionally isolated because chunking strategy is one of the most important RAG tuning parameters. Future strategies can introduce token-aware, semantic, or structure-aware chunking.
+The default `RecursiveChunkingStrategy` uses both character and approximate token budgets and prefers boundaries in this order:
+
+1. paragraphs
+2. sentences
+3. whitespace
+4. hard boundary fallback
+
+Configurable overlap is preserved between chunks.
+
+## Retrieval flow
+
+`RetrievalService` coordinates retrieval without owning every ranking policy.
+
+The default path is:
+
+1. embed the query;
+2. generate a semantic candidate pool;
+3. apply exact metadata filters;
+4. compute normalized BM25 lexical evidence;
+5. combine semantic and lexical scores;
+6. apply a score threshold;
+7. fuse independent rankings with Reciprocal Rank Fusion;
+8. apply deterministic diversity reranking;
+9. return the final evidence set.
+
+The diversity reranker removes near-duplicate chunks and limits repeated evidence from the same document.
 
 ## Vector storage
 
-The initial vector store is in-memory and calculates cosine similarity directly. This makes the mathematical behavior inspectable and keeps the first implementation dependency-light.
+The current vector store is in-memory and calculates cosine similarity directly. It also supports deletion by stable document id so reindex and delete lifecycle behavior is exercised through the same port expected from a persistent adapter.
 
-The `VectorStore` port is the stable boundary for future adapters such as pgvector or Qdrant.
+`VectorStore` is the boundary for the next persistence stage, such as PostgreSQL + pgvector.
 
-## Grounding
+## Context and grounding
 
-Generation receives only the retrieved context. The generation adapter is instructed to avoid unsupported claims and to use source identifiers such as `[S1]` and `[S2]`.
+`ContextBuilderService` owns source labeling, citation projection, and a bounded generation context.
 
-The API response also returns structured citations with document and chunk identifiers, excerpts, and ranking scores.
+Retrieved content is treated as untrusted data. The generation adapter is instructed to ignore instructions embedded inside documents, answer only from supplied evidence, and cite source identifiers such as `[S1]` and `[S2]`.
+
+## File upload security boundary
+
+Multipart upload currently accepts text, Markdown, HTML, and PDF documents up to 10 MB.
+
+The upload path applies:
+
+- MIME allowlisting;
+- empty-file rejection;
+- PDF signature validation;
+- readable-text validation;
+- primitive-only metadata validation;
+- bounded in-memory upload size.
+
+PDF parsing is isolated in infrastructure and the parser is explicitly destroyed after extraction.
 
 ## Design principles
 
 Patterns and abstractions are introduced only when they address a concrete change axis:
 
-- provider replacement → Ports and Adapters
-- ranking replacement → Strategy Pattern
-- read/write separation → CQRS
-- vendor isolation → Dependency Inversion
-- isolated responsibilities → SOLID / SRP
+- provider replacement -> Ports and Adapters
+- ranking replacement -> Strategy Pattern
+- chunking replacement -> Strategy Pattern
+- read/write separation -> CQRS
+- vendor isolation -> Dependency Inversion
+- isolated responsibilities -> SOLID / SRP
 
 The architecture intentionally avoids abstraction for abstraction's sake.
 
@@ -100,13 +147,13 @@ The architecture intentionally avoids abstraction for abstraction's sake.
 
 The next logical production steps are:
 
-1. persistent vector-store adapter
-2. BM25 lexical index
-3. Reciprocal Rank Fusion or reranker stage
-4. metadata filtering
-5. token-aware context budget
-6. ingestion loaders and parsers
-7. structured logs and tracing
-8. retrieval and groundedness evaluation
-9. resilience policies and rate limiting
-10. security controls for multi-tenant corpora
+1. PostgreSQL + pgvector persistence
+2. durable document/revision state
+3. database-level metadata filtering
+4. retrieval evaluation datasets and metrics
+5. groundedness/citation evaluation
+6. structured metrics and distributed tracing
+7. provider retry, backoff and circuit-breaker policies
+8. asynchronous ingestion for large corpora
+9. authentication, authorization and tenant isolation
+10. horizontal query scaling and caching

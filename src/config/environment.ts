@@ -7,6 +7,8 @@ export interface EnvironmentVariables {
   RAG_CHUNK_OVERLAP?: string;
   RAG_TOP_K?: string;
   RAG_MAX_CONTEXT_CHARS?: string;
+  RAG_CANDIDATE_MULTIPLIER?: string;
+  RAG_MIN_SCORE?: string;
 }
 
 /** Validates critical runtime configuration before the application starts. */
@@ -37,6 +39,20 @@ export function validateEnvironment(
     const overlap = Number(config.RAG_CHUNK_OVERLAP);
     if (!Number.isInteger(overlap) || overlap < 0) {
       throw new Error('RAG_CHUNK_OVERLAP must be a non-negative integer');
+    }
+  }
+
+  if (config.RAG_CANDIDATE_MULTIPLIER !== undefined) {
+    const multiplier = Number(config.RAG_CANDIDATE_MULTIPLIER);
+    if (!Number.isFinite(multiplier) || multiplier <= 0) {
+      throw new Error('RAG_CANDIDATE_MULTIPLIER must be greater than zero');
+    }
+  }
+
+  if (config.RAG_MIN_SCORE !== undefined) {
+    const minScore = Number(config.RAG_MIN_SCORE);
+    if (!Number.isFinite(minScore) || minScore < 0) {
+      throw new Error('RAG_MIN_SCORE must be zero or greater');
     }
   }
 

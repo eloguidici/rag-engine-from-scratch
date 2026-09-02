@@ -1,6 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import { InvalidProviderResponseError } from '../domain/errors';
 import { RagAnswer, SourceDocument } from '../domain/models';
 import {
   EMBEDDING_PROVIDER,
@@ -21,6 +22,8 @@ export interface IngestionResult {
 
 @Injectable()
 export class RagService {
+  private readonly logger = new Logger(RagService.name);
+
   constructor(
     private readonly chunker: TextChunkerService,
     private readonly retrieval: RetrievalService,
@@ -31,18 +34,17 @@ export class RagService {
     @Inject(GENERATION_PROVIDER) private readonly generator: GenerationProvider,
   ) {}
 
-  /**
-   * Normalizes, chunks, embeds and indexes one source document.
-   */
+  /** Normalizes, chunks, embeds and indexes one source document. */
   async ingest(
     input: Omit<SourceDocument, 'id'> & { id?: string },
   ): Promise<IngestionResult> {
+    const startedAt = Date.now();
     const document: SourceDocument = { ...input, id: input.id ?? randomUUID() };
     const chunks = this.chunker.chunk(document);
     const vectors = await this.embeddings.embed(chunks.map((chunk) => chunk.text));
 
     if (vectors.length !== chunks.length) {
-      throw new Error(
+      throw new InvalidProviderResponseError(
         `Embedding provider returned ${vectors.length} vectors for ${chunks.length} chunks`,
       );
     }
@@ -51,22 +53,40 @@ export class RagService {
       chunks.map((chunk, index) => ({ ...chunk, vector: vectors[index] })),
     );
 
+    this.logger.log(
+      JSON.stringify({
+        event: 'rag.ingest.completed',
+        documentId: document.id,
+        chunksIndexed: chunks.length,
+        durationMs: Date.now() - startedAt,
+      }),
+    );
+
     return { documentId: document.id, chunksIndexed: chunks.length };
   }
 
-  /**
-   * Retrieves relevant evidence, constrains the generation context and returns
-   * an answer together with the exact chunks used as citations.
-   */
+  /** Retrieves evidence and returns a grounded answer with citations. */
   async query(
     question: string,
     requestedTopK?: number,
     filters?: Record<string, string | number | boolean>,
   ): Promise<RagAnswer> {
+    const startedAt = Date.now();
     const topK = requestedTopK ?? Number(this.config.get('RAG_TOP_K') ?? 6);
     const hits = await this.retrieval.search(question, topK, filters);
     const { context, sources } = this.contextBuilder.build(hits);
     const answer = await this.generator.generate(question, context);
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'rag.query.completed',
+        topK,
+        filters: filters ?? {},
+        retrievedChunks: hits.length,
+        contextChars: context.length,
+        durationMs: Date.now() - startedAt,
+      }),
+    );
 
     return { answer, citations: sources };
   }

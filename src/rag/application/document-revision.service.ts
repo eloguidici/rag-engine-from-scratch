@@ -1,9 +1,8 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   DOCUMENT_REVISION_REPOSITORY,
   DocumentRevisionRepository,
 } from '../domain/document-revision.repository';
-import { InMemoryDocumentRevisionRepository } from '../infrastructure/in-memory-document-revision.repository';
 
 export interface RevisionDecision {
   duplicate: boolean;
@@ -13,15 +12,10 @@ export interface RevisionDecision {
 /** Coordinates duplicate detection and revision persistence. */
 @Injectable()
 export class DocumentRevisionService {
-  private readonly repository: DocumentRevisionRepository;
-
   constructor(
-    @Optional()
     @Inject(DOCUMENT_REVISION_REPOSITORY)
-    repository?: DocumentRevisionRepository,
-  ) {
-    this.repository = repository ?? new InMemoryDocumentRevisionRepository();
-  }
+    private readonly repository: DocumentRevisionRepository,
+  ) {}
 
   async evaluate(documentId: string, contentHash: string): Promise<RevisionDecision> {
     const current = await this.repository.get(documentId);

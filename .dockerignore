@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log*
+coverage
+dist
+.git
+.github
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+*.md
+!README.md
+examples
+ai

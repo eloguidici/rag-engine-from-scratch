@@ -10,6 +10,9 @@ export interface EnvironmentVariables {
   RAG_MAX_CONTEXT_CHARS?: string;
   RAG_CANDIDATE_MULTIPLIER?: string;
   RAG_MIN_SCORE?: string;
+  RAG_PERSISTENCE?: string;
+  DATABASE_URL?: string;
+  POSTGRES_POOL_MAX?: string;
 }
 
 /** Validates critical runtime configuration before the application starts. */
@@ -28,6 +31,7 @@ export function validateEnvironment(
     'RAG_CHUNK_MAX_TOKENS',
     'RAG_TOP_K',
     'RAG_MAX_CONTEXT_CHARS',
+    'POSTGRES_POOL_MAX',
   ] as const;
 
   for (const key of positiveIntegerKeys) {
@@ -58,6 +62,16 @@ export function validateEnvironment(
     }
   }
 
+  const persistence = optionalString(config.RAG_PERSISTENCE) ?? 'memory';
+  if (persistence !== 'memory' && persistence !== 'postgres') {
+    throw new Error('RAG_PERSISTENCE must be memory or postgres');
+  }
+
+  const databaseUrl = optionalString(config.DATABASE_URL)?.trim();
+  if (persistence === 'postgres' && !databaseUrl) {
+    throw new Error('DATABASE_URL is required when RAG_PERSISTENCE=postgres');
+  }
+
   return {
     PORT: optionalString(config.PORT),
     OPENAI_API_KEY: openAiApiKey,
@@ -70,6 +84,9 @@ export function validateEnvironment(
     RAG_MAX_CONTEXT_CHARS: optionalString(config.RAG_MAX_CONTEXT_CHARS),
     RAG_CANDIDATE_MULTIPLIER: optionalString(config.RAG_CANDIDATE_MULTIPLIER),
     RAG_MIN_SCORE: optionalString(config.RAG_MIN_SCORE),
+    RAG_PERSISTENCE: persistence,
+    DATABASE_URL: databaseUrl,
+    POSTGRES_POOL_MAX: optionalString(config.POSTGRES_POOL_MAX),
   };
 }
 

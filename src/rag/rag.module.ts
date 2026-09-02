@@ -12,12 +12,16 @@ import {
   GENERATION_PROVIDER,
   VECTOR_STORE,
 } from './domain/ports';
+import { RETRIEVAL_FUSION_STRATEGY } from './domain/retrieval-fusion.strategy';
+import { RERANKER } from './domain/reranker';
 import { RETRIEVAL_SCORING_STRATEGY } from './domain/retrieval-scoring.strategy';
+import { DiversityReranker } from './infrastructure/diversity-reranker';
 import { InMemoryVectorStore } from './infrastructure/in-memory-vector-store';
 import {
   OpenAIEmbeddingProvider,
   OpenAIGenerationProvider,
 } from './infrastructure/openai.providers';
+import { ReciprocalRankFusionStrategy } from './infrastructure/reciprocal-rank-fusion.strategy';
 import { WeightedHybridScoringStrategy } from './infrastructure/weighted-hybrid-scoring.strategy';
 
 const commandHandlers = [IngestDocumentHandler];
@@ -40,6 +44,11 @@ const queryHandlers = [AskRagHandler];
       provide: RETRIEVAL_SCORING_STRATEGY,
       useClass: WeightedHybridScoringStrategy,
     },
+    {
+      provide: RETRIEVAL_FUSION_STRATEGY,
+      useClass: ReciprocalRankFusionStrategy,
+    },
+    { provide: RERANKER, useClass: DiversityReranker },
   ],
 })
 export class RagModule {}

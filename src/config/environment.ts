@@ -8,6 +8,8 @@ export interface EnvironmentVariables {
   PROVIDER_TIMEOUT_MS?: string;
   PROVIDER_MAX_RETRIES?: string;
   PROVIDER_RETRY_BASE_MS?: string;
+  PROVIDER_CIRCUIT_FAILURE_THRESHOLD?: string;
+  PROVIDER_CIRCUIT_RESET_MS?: string;
   EMBEDDING_BATCH_SIZE?: string;
   RAG_CHUNK_SIZE?: string;
   RAG_CHUNK_OVERLAP?: string;
@@ -43,6 +45,8 @@ export function validateEnvironment(
     'PORT',
     'PROVIDER_TIMEOUT_MS',
     'PROVIDER_RETRY_BASE_MS',
+    'PROVIDER_CIRCUIT_FAILURE_THRESHOLD',
+    'PROVIDER_CIRCUIT_RESET_MS',
     'EMBEDDING_BATCH_SIZE',
     'RAG_CHUNK_SIZE',
     'RAG_CHUNK_MAX_TOKENS',
@@ -106,6 +110,10 @@ export function validateEnvironment(
     PROVIDER_TIMEOUT_MS: optionalString(config.PROVIDER_TIMEOUT_MS),
     PROVIDER_MAX_RETRIES: optionalString(config.PROVIDER_MAX_RETRIES),
     PROVIDER_RETRY_BASE_MS: optionalString(config.PROVIDER_RETRY_BASE_MS),
+    PROVIDER_CIRCUIT_FAILURE_THRESHOLD: optionalString(
+      config.PROVIDER_CIRCUIT_FAILURE_THRESHOLD,
+    ),
+    PROVIDER_CIRCUIT_RESET_MS: optionalString(config.PROVIDER_CIRCUIT_RESET_MS),
     EMBEDDING_BATCH_SIZE: optionalString(config.EMBEDDING_BATCH_SIZE),
     RAG_CHUNK_SIZE: optionalString(config.RAG_CHUNK_SIZE),
     RAG_CHUNK_OVERLAP: optionalString(config.RAG_CHUNK_OVERLAP),

@@ -10,6 +10,7 @@ describe('ContextBuilderService', () => {
         chunk: {
           id: 'doc-1:0',
           documentId: 'doc-1',
+          index: 0,
           text: 'RAG combines retrieval and generation.',
           metadata: { title: 'Architecture Notes' },
         },

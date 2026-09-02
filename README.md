@@ -4,6 +4,18 @@ A production-minded Retrieval-Augmented Generation engine built with NestJS and 
 
 The project keeps the important RAG mechanics explicit and replaceable: ingestion, normalization, chunking, embeddings, vector search, BM25, hybrid scoring, Reciprocal Rank Fusion, reranking, bounded context construction, generation, citations, file extraction, document revisions, persistence and evaluation.
 
+## Repository guide
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Architecture decisions](docs/DECISIONS.md)
+- [Retrieval evaluation](docs/EVALUATION.md)
+- [Production readiness](docs/PRODUCTION-READINESS.md)
+- [Security policy](SECURITY.md)
+- [Contributing workflow](CONTRIBUTING.md)
+- [AI-assisted engineering workflow](AI-ENGINEERING.md)
+- [Repository skills](ai/README.md)
+- [Engineering notes and trade-offs](docs/ENGINEERING-NOTES.md)
+
 ## Why this project exists
 
 RAG frameworks are useful, but they can hide the mechanics that matter when a system has to be debugged, evaluated, optimized, secured or adapted to production constraints. This implementation keeps those mechanics visible so each stage can be reasoned about, measured, replaced and tested independently.
@@ -21,7 +33,8 @@ This repository is intentionally designed as an architecture and engineering por
 - bounded, citation-aware generation with retrieved context treated as untrusted input;
 - deterministic retrieval evaluation with Recall@K, MRR and nDCG@K;
 - production-minded observability, provider timeouts/retries and fail-fast configuration;
-- CI that validates lint, tests, build and real PostgreSQL/pgvector integration behavior.
+- reproducible dependency installation through a committed lockfile and `npm ci`;
+- CI that validates production dependency security, lint, tests, build and real PostgreSQL/pgvector integration behavior.
 
 The goal is not to imitate a full SaaS platform. It is to make the engineering decisions behind a serious RAG backend visible, testable and defensible in a technical review.
 
@@ -74,7 +87,7 @@ The application layer depends on ports rather than infrastructure implementation
 - Request correlation id and structured HTTP latency logs.
 - Configurable OpenAI timeout and retry policy.
 - Deterministic retrieval evaluation metrics: Recall@K, MRR and nDCG@K.
-- GitHub Actions quality gate for lint, tests, build and real pgvector persistence tests.
+- GitHub Actions quality gate for audit, lint, tests, build and real pgvector persistence tests.
 
 ## Project structure
 
@@ -96,17 +109,22 @@ src/
 └── main.ts
 
 database/
-└── init.sql                  # pgvector schema and indexes
+└── init.sql
 
 docs/
 ├── ARCHITECTURE.md
 ├── DECISIONS.md
+├── ENGINEERING-NOTES.md
 ├── EVALUATION.md
 ├── PRODUCTION-READINESS.md
 └── RETRIEVAL.md
 
+ai/
+├── README.md
+└── skills/
+
 examples/
-├── demo.sh                   # Reproducible ingest -> query -> citations flow
+├── demo.sh
 └── evaluation/
     └── retrieval-dataset.json
 ```
@@ -181,21 +199,13 @@ Requirements:
 
 ```bash
 cp .env.example .env
-npm install
+npm ci
 npm run start:dev
 ```
 
-Swagger UI:
+Swagger UI: `http://localhost:3000/docs`
 
-```text
-http://localhost:3000/docs
-```
-
-Health:
-
-```text
-GET /health
-```
+Health: `GET /health`
 
 ## Docker with durable persistence
 
@@ -215,7 +225,7 @@ With the API running, execute:
 bash examples/demo.sh
 ```
 
-The script performs a health check, ingests a small document, asks a grounded question using a metadata filter, returns the answer with the retrieved citations, and deletes the demo document. Set `BASE_URL` to point it at another environment:
+The script performs a health check, ingests a small document, asks a grounded question using a metadata filter, returns the answer with the retrieved citations, and deletes the demo document.
 
 ```bash
 BASE_URL=http://localhost:3000 bash examples/demo.sh
@@ -282,13 +292,7 @@ Critical configuration is validated before startup.
 
 ## Evaluation
 
-Retrieval-quality helpers implement:
-
-- Recall@K
-- Mean Reciprocal Rank (MRR)
-- nDCG@K
-
-The metrics are deterministic, unit-tested and provider-independent. See `docs/EVALUATION.md` and `examples/evaluation/retrieval-dataset.json` for the evaluation workflow and dataset format.
+Retrieval-quality helpers implement Recall@K, Mean Reciprocal Rank (MRR) and nDCG@K. The metrics are deterministic, unit-tested and provider-independent. See `docs/EVALUATION.md` and `examples/evaluation/retrieval-dataset.json` for the evaluation workflow and dataset format.
 
 Generation evaluation remains intentionally separate so retrieval metrics are not conflated with LLM judging. A production dataset should additionally measure groundedness, answer relevance, citation correctness and unsupported claims.
 
@@ -303,27 +307,21 @@ OpenAI clients use configurable request timeout and retry limits. Provider failu
 Local quality commands:
 
 ```bash
+npm ci
+npm audit --omit=dev --audit-level=high
 npm run lint
 npm test -- --runInBand
 npm run test:cov
 npm run build
 ```
 
-The GitHub Actions pipeline runs:
-
-1. dependency installation;
-2. lint;
-3. unit and integration tests;
-4. PostgreSQL/pgvector persistence tests against a real service container;
-5. build.
-
-The integration suite verifies pgvector upsert/search/delete behavior and durable document revision state.
+The GitHub Actions pipeline validates reproducible installation from `package-lock.json`, audits production dependencies for high/critical vulnerabilities, runs lint, unit/integration tests, real PostgreSQL/pgvector persistence tests and the production build.
 
 ## Security boundaries
 
 Retrieved documents are treated as untrusted data. The generation system prompt instructs the model to ignore instructions embedded in retrieved content and answer only from supplied evidence.
 
-The API also applies strict DTO validation, unknown-field rejection, upload limits, MIME validation, PDF signature validation, bounded generation context and consistent error envelopes.
+The API also applies strict DTO validation, unknown-field rejection, upload limits, MIME validation, PDF signature validation, bounded generation context and consistent error envelopes. See `SECURITY.md` for the repository security policy.
 
 ## Production boundary
 

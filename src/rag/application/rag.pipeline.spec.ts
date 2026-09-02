@@ -1,11 +1,18 @@
 import { ConfigService } from '@nestjs/config';
+import { EmbeddingProvider, GenerationProvider } from '../domain/ports';
+import {
+  HtmlDocumentLoader,
+  MarkdownDocumentLoader,
+  PlainTextDocumentLoader,
+} from '../infrastructure/document-loaders';
+import { InMemoryVectorStore } from '../infrastructure/in-memory-vector-store';
+import { WeightedHybridScoringStrategy } from '../infrastructure/weighted-hybrid-scoring.strategy';
 import { ContextBuilderService } from './context-builder.service';
+import { DocumentIngestionService } from './document-ingestion.service';
+import { DocumentRevisionService } from './document-revision.service';
 import { RagService } from './rag.service';
 import { RetrievalService } from './retrieval.service';
 import { TextChunkerService } from './text-chunker.service';
-import { EmbeddingProvider, GenerationProvider } from '../domain/ports';
-import { InMemoryVectorStore } from '../infrastructure/in-memory-vector-store';
-import { WeightedHybridScoringStrategy } from '../infrastructure/weighted-hybrid-scoring.strategy';
 
 class DeterministicEmbeddingProvider implements EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]> {
@@ -23,7 +30,8 @@ class DeterministicEmbeddingProvider implements EmbeddingProvider {
 }
 
 class DeterministicGenerationProvider implements GenerationProvider {
-  generate(_question: string, context: string): Promise<string> {
+  generate(question: string, context: string): Promise<string> {
+    void question;
     return Promise.resolve(
       context.includes('invoice payment')
         ? 'The invoice payment is pending. [S1]'
@@ -33,7 +41,7 @@ class DeterministicGenerationProvider implements GenerationProvider {
 }
 
 describe('RAG pipeline', () => {
-  it('ingests, retrieves with metadata filters, and returns grounded citations', async () => {
+  it('ingests, deduplicates, reindexes and returns grounded citations', async () => {
     const config = new ConfigService({
       RAG_CHUNK_SIZE: '500',
       RAG_CHUNK_OVERLAP: '50',
@@ -43,28 +51,48 @@ describe('RAG pipeline', () => {
     const store = new InMemoryVectorStore();
     const strategy = new WeightedHybridScoringStrategy();
     const retrieval = new RetrievalService(embeddings, store, strategy);
+    const ingestion = new DocumentIngestionService(
+      new PlainTextDocumentLoader(),
+      new MarkdownDocumentLoader(),
+      new HtmlDocumentLoader(),
+    );
     const rag = new RagService(
       new TextChunkerService(config),
       retrieval,
       new ContextBuilderService(),
+      ingestion,
+      new DocumentRevisionService(),
       config,
       embeddings,
       store,
       new DeterministicGenerationProvider(),
     );
 
-    await rag.ingest({
+    const first = await rag.ingest({
       id: 'finance-1',
       title: 'Finance Notes',
-      content: 'The invoice payment is pending approval by finance.',
+      content: '# Status\nThe invoice payment is pending approval by finance.',
+      format: 'markdown',
       metadata: { department: 'finance' },
     });
-    await rag.ingest({
-      id: 'ops-1',
-      title: 'Operations Notes',
-      content: 'Telemetry alerts are reviewed by the operations team.',
-      metadata: { department: 'operations' },
+    const duplicate = await rag.ingest({
+      id: 'finance-1',
+      title: 'Finance Notes',
+      content: '# Status\nThe invoice payment is pending approval by finance.',
+      format: 'markdown',
+      metadata: { department: 'finance' },
     });
+    const updated = await rag.ingest({
+      id: 'finance-1',
+      title: 'Finance Notes',
+      content: '<p>The invoice payment is pending final approval by finance.</p>',
+      format: 'html',
+      metadata: { department: 'finance' },
+    });
+
+    expect(first).toEqual(expect.objectContaining({ version: 1, duplicate: false }));
+    expect(duplicate).toEqual(expect.objectContaining({ version: 1, duplicate: true }));
+    expect(updated).toEqual(expect.objectContaining({ version: 2, duplicate: false }));
 
     const result = await rag.query('What is the invoice payment status?', 3, {
       department: 'finance',

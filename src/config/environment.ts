@@ -13,7 +13,8 @@ export interface EnvironmentVariables {
 export function validateEnvironment(
   config: Record<string, unknown>,
 ): EnvironmentVariables {
-  const openAiApiKey = String(config.OPENAI_API_KEY ?? '').trim();
+  const rawApiKey = config.OPENAI_API_KEY;
+  const openAiApiKey = typeof rawApiKey === 'string' ? rawApiKey.trim() : '';
   if (!openAiApiKey) {
     throw new Error('OPENAI_API_KEY is required');
   }
@@ -39,5 +40,5 @@ export function validateEnvironment(
     }
   }
 
-  return config as unknown as EnvironmentVariables;
+  return { ...(config as EnvironmentVariables), OPENAI_API_KEY: openAiApiKey };
 }

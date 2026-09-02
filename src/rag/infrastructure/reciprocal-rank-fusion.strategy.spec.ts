@@ -21,11 +21,11 @@ const hit = (
 describe('ReciprocalRankFusionStrategy', () => {
   const strategy = new ReciprocalRankFusionStrategy();
 
-  it('rewards chunks that rank well across semantic and lexical signals', () => {
+  it('rewards chunks supported by both semantic and lexical rankings', () => {
     const results = strategy.fuse([
       hit('balanced', 0.8, 0.8),
-      hit('semantic-only', 0.95, 0.1),
-      hit('lexical-only', 0.1, 0.95),
+      hit('semantic-only', 0.95, 0),
+      hit('lexical-only', 0, 0.95),
     ]);
 
     expect(results[0].chunk.id).toBe('balanced');

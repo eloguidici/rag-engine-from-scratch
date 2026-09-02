@@ -46,11 +46,17 @@ class FakeVectorStore implements VectorStore {
     return Promise.resolve();
   }
 
+  deleteByDocumentId(documentId: string): Promise<void> {
+    void documentId;
+    return Promise.resolve();
+  }
+
   all(): Promise<EmbeddedChunk[]> {
     return Promise.resolve(chunks);
   }
 
-  semanticSearch(_queryVector: number[], topK: number): Promise<SearchHit[]> {
+  semanticSearch(queryVector: number[], topK: number): Promise<SearchHit[]> {
+    void queryVector;
     return Promise.resolve(
       chunks.slice(0, topK).map((chunk) => ({
         chunk,

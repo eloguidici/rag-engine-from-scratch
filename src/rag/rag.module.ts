@@ -11,11 +11,16 @@ import {
   GENERATION_PROVIDER,
   VECTOR_STORE,
 } from './domain/ports';
+import { RETRIEVAL_SCORING_STRATEGY } from './domain/retrieval-scoring.strategy';
 import { InMemoryVectorStore } from './infrastructure/in-memory-vector-store';
 import {
   OpenAIEmbeddingProvider,
   OpenAIGenerationProvider,
 } from './infrastructure/openai.providers';
+import { WeightedHybridScoringStrategy } from './infrastructure/weighted-hybrid-scoring.strategy';
+
+const commandHandlers = [IngestDocumentHandler];
+const queryHandlers = [AskRagHandler];
 
 @Module({
   imports: [CqrsModule],
@@ -24,11 +29,12 @@ import {
     RagService,
     RetrievalService,
     TextChunkerService,
-    IngestDocumentHandler,
-    AskRagHandler,
+    ...commandHandlers,
+    ...queryHandlers,
     { provide: EMBEDDING_PROVIDER, useClass: OpenAIEmbeddingProvider },
     { provide: GENERATION_PROVIDER, useClass: OpenAIGenerationProvider },
     { provide: VECTOR_STORE, useClass: InMemoryVectorStore },
+    { provide: RETRIEVAL_SCORING_STRATEGY, useClass: WeightedHybridScoringStrategy },
   ],
 })
 export class RagModule {}

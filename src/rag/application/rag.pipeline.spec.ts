@@ -8,23 +8,27 @@ import { InMemoryVectorStore } from '../infrastructure/in-memory-vector-store';
 import { WeightedHybridScoringStrategy } from '../infrastructure/weighted-hybrid-scoring.strategy';
 
 class DeterministicEmbeddingProvider implements EmbeddingProvider {
-  async embed(texts: string[]): Promise<number[][]> {
-    return texts.map((text) => {
-      const normalized = text.toLowerCase();
-      return [
-        normalized.includes('invoice') ? 1 : 0,
-        normalized.includes('payment') ? 1 : 0,
-        normalized.includes('telemetry') ? 1 : 0,
-      ];
-    });
+  embed(texts: string[]): Promise<number[][]> {
+    return Promise.resolve(
+      texts.map((text) => {
+        const normalized = text.toLowerCase();
+        return [
+          normalized.includes('invoice') ? 1 : 0,
+          normalized.includes('payment') ? 1 : 0,
+          normalized.includes('telemetry') ? 1 : 0,
+        ];
+      }),
+    );
   }
 }
 
 class DeterministicGenerationProvider implements GenerationProvider {
-  async generate(_question: string, context: string): Promise<string> {
-    return context.includes('invoice payment')
-      ? 'The invoice payment is pending. [S1]'
-      : 'There is not enough evidence.';
+  generate(_question: string, context: string): Promise<string> {
+    return Promise.resolve(
+      context.includes('invoice payment')
+        ? 'The invoice payment is pending. [S1]'
+        : 'There is not enough evidence.',
+    );
   }
 }
 

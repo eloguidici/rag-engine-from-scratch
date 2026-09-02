@@ -37,4 +37,14 @@ export class QueryRagDto {
   @Min(1)
   @Max(20)
   topK?: number;
+
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description: 'Exact-match metadata filters applied before final ranking.',
+    example: { category: 'architecture', tenantId: 'acme' },
+  })
+  @IsOptional()
+  @IsObject()
+  filters?: Record<string, string | number | boolean>;
 }

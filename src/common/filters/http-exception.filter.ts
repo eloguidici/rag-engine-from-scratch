@@ -10,9 +10,7 @@ import { Request, Response } from 'express';
 
 /**
  * Normalizes all unhandled exceptions into a consistent HTTP error envelope.
- *
- * Infrastructure concerns such as transport formatting and logging live here
- * so application and domain layers remain independent from HTTP semantics.
+ * Infrastructure concerns stay here so application/domain code remains HTTP-agnostic.
  */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -38,7 +36,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? payload
         : this.extractMessage(payload as Record<string, unknown>);
 
-    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (status >= Number(HttpStatus.INTERNAL_SERVER_ERROR)) {
       this.logger.error(
         `${request.method} ${request.url} failed`,
         exception instanceof Error ? exception.stack : String(exception),

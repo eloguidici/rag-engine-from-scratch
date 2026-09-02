@@ -9,6 +9,6 @@ export class AskRagHandler implements IQueryHandler<AskRagQuery> {
   constructor(private readonly ragService: RagService) {}
 
   execute(query: AskRagQuery): Promise<RagAnswer> {
-    return this.ragService.query(query.question, query.topK);
+    return this.ragService.query(query.question, query.topK, query.filters);
   }
 }

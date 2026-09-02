@@ -6,8 +6,10 @@ import { RelevanceReranker } from '../domain/relevance-reranker';
 
 @Injectable()
 export class NoOpRelevanceReranker implements RelevanceReranker {
-  async rerank(_query: string, hits: SearchHit[], _topK: number): Promise<SearchHit[]> {
-    return hits;
+  rerank(query: string, hits: SearchHit[], topK: number): Promise<SearchHit[]> {
+    void query;
+    void topK;
+    return Promise.resolve(hits);
   }
 }
 

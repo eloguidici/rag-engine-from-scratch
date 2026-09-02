@@ -24,6 +24,10 @@ import {
   VECTOR_STORE,
   VectorStore,
 } from './domain/ports';
+import {
+  RELEVANCE_RERANKER,
+  RelevanceReranker,
+} from './domain/relevance-reranker';
 import { RETRIEVAL_FUSION_STRATEGY } from './domain/retrieval-fusion.strategy';
 import { RERANKER } from './domain/reranker';
 import { RETRIEVAL_SCORING_STRATEGY } from './domain/retrieval-scoring.strategy';
@@ -44,6 +48,10 @@ import { PostgresDocumentRevisionRepository } from './infrastructure/postgres-do
 import { POSTGRES_POOL } from './infrastructure/postgres.tokens';
 import { PostgresVectorStore } from './infrastructure/postgres-vector-store';
 import { ReciprocalRankFusionStrategy } from './infrastructure/reciprocal-rank-fusion.strategy';
+import {
+  CohereRelevanceReranker,
+  NoOpRelevanceReranker,
+} from './infrastructure/relevance-rerankers';
 import { RecursiveChunkingStrategy } from './infrastructure/recursive-chunking.strategy';
 import { UploadedDocumentExtractor } from './infrastructure/uploaded-document.extractor';
 import { WeightedHybridScoringStrategy } from './infrastructure/weighted-hybrid-scoring.strategy';
@@ -65,6 +73,8 @@ const queryHandlers = [AskRagHandler];
     MarkdownDocumentLoader,
     HtmlDocumentLoader,
     ManagedPostgresPool,
+    NoOpRelevanceReranker,
+    CohereRelevanceReranker,
     ...commandHandlers,
     ...queryHandlers,
     { provide: POSTGRES_POOL, useExisting: ManagedPostgresPool },
@@ -98,6 +108,16 @@ const queryHandlers = [AskRagHandler];
     {
       provide: RETRIEVAL_FUSION_STRATEGY,
       useClass: ReciprocalRankFusionStrategy,
+    },
+    {
+      provide: RELEVANCE_RERANKER,
+      inject: [ConfigService, NoOpRelevanceReranker, CohereRelevanceReranker],
+      useFactory: (
+        config: ConfigService,
+        noOp: NoOpRelevanceReranker,
+        cohere: CohereRelevanceReranker,
+      ): RelevanceReranker =>
+        config.get<string>('RAG_RELEVANCE_RERANKER') === 'cohere' ? cohere : noOp,
     },
     { provide: RERANKER, useClass: DiversityReranker },
   ],

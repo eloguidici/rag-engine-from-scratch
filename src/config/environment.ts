@@ -5,6 +5,10 @@ export interface EnvironmentVariables {
   OPENAI_CHAT_MODEL?: string;
   OPENAI_TIMEOUT_MS?: string;
   OPENAI_MAX_RETRIES?: string;
+  COHERE_API_KEY?: string;
+  COHERE_RERANK_MODEL?: string;
+  RAG_RELEVANCE_RERANKER?: string;
+  RAG_RERANK_TIMEOUT_MS?: string;
   RAG_CHUNK_SIZE?: string;
   RAG_CHUNK_OVERLAP?: string;
   RAG_CHUNK_MAX_TOKENS?: string;
@@ -30,6 +34,7 @@ export function validateEnvironment(
   const positiveIntegerKeys = [
     'PORT',
     'OPENAI_TIMEOUT_MS',
+    'RAG_RERANK_TIMEOUT_MS',
     'RAG_CHUNK_SIZE',
     'RAG_CHUNK_MAX_TOKENS',
     'RAG_TOP_K',
@@ -77,6 +82,16 @@ export function validateEnvironment(
     throw new Error('RAG_PERSISTENCE must be memory or postgres');
   }
 
+  const reranker = optionalString(config.RAG_RELEVANCE_RERANKER) ?? 'none';
+  if (reranker !== 'none' && reranker !== 'cohere') {
+    throw new Error('RAG_RELEVANCE_RERANKER must be none or cohere');
+  }
+
+  const cohereApiKey = optionalString(config.COHERE_API_KEY)?.trim();
+  if (reranker === 'cohere' && !cohereApiKey) {
+    throw new Error('COHERE_API_KEY is required when RAG_RELEVANCE_RERANKER=cohere');
+  }
+
   const databaseUrl = optionalString(config.DATABASE_URL)?.trim();
   if (persistence === 'postgres' && !databaseUrl) {
     throw new Error('DATABASE_URL is required when RAG_PERSISTENCE=postgres');
@@ -89,6 +104,10 @@ export function validateEnvironment(
     OPENAI_CHAT_MODEL: optionalString(config.OPENAI_CHAT_MODEL),
     OPENAI_TIMEOUT_MS: optionalString(config.OPENAI_TIMEOUT_MS),
     OPENAI_MAX_RETRIES: optionalString(config.OPENAI_MAX_RETRIES),
+    COHERE_API_KEY: cohereApiKey,
+    COHERE_RERANK_MODEL: optionalString(config.COHERE_RERANK_MODEL),
+    RAG_RELEVANCE_RERANKER: reranker,
+    RAG_RERANK_TIMEOUT_MS: optionalString(config.RAG_RERANK_TIMEOUT_MS),
     RAG_CHUNK_SIZE: optionalString(config.RAG_CHUNK_SIZE),
     RAG_CHUNK_OVERLAP: optionalString(config.RAG_CHUNK_OVERLAP),
     RAG_CHUNK_MAX_TOKENS: optionalString(config.RAG_CHUNK_MAX_TOKENS),

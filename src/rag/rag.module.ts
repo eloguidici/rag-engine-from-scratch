@@ -3,6 +3,8 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { RagController } from './api/rag.controller';
 import { IngestDocumentHandler } from './application/commands/ingest-document.handler';
 import { ContextBuilderService } from './application/context-builder.service';
+import { DocumentIngestionService } from './application/document-ingestion.service';
+import { DocumentRevisionService } from './application/document-revision.service';
 import { RagService } from './application/rag.service';
 import { RetrievalService } from './application/retrieval.service';
 import { AskRagHandler } from './application/queries/ask-rag.handler';
@@ -16,6 +18,11 @@ import { RETRIEVAL_FUSION_STRATEGY } from './domain/retrieval-fusion.strategy';
 import { RERANKER } from './domain/reranker';
 import { RETRIEVAL_SCORING_STRATEGY } from './domain/retrieval-scoring.strategy';
 import { DiversityReranker } from './infrastructure/diversity-reranker';
+import {
+  HtmlDocumentLoader,
+  MarkdownDocumentLoader,
+  PlainTextDocumentLoader,
+} from './infrastructure/document-loaders';
 import { InMemoryVectorStore } from './infrastructure/in-memory-vector-store';
 import {
   OpenAIEmbeddingProvider,
@@ -35,6 +42,11 @@ const queryHandlers = [AskRagHandler];
     RetrievalService,
     ContextBuilderService,
     TextChunkerService,
+    DocumentIngestionService,
+    DocumentRevisionService,
+    PlainTextDocumentLoader,
+    MarkdownDocumentLoader,
+    HtmlDocumentLoader,
     ...commandHandlers,
     ...queryHandlers,
     { provide: EMBEDDING_PROVIDER, useClass: OpenAIEmbeddingProvider },

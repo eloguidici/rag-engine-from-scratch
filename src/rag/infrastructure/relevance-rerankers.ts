@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ExternalProviderError } from '../domain/errors';
+import {
+  ExternalProviderError,
+  InvalidProviderResponseError,
+} from '../domain/errors';
 import { SearchHit } from '../domain/models';
 import { RelevanceReranker } from '../domain/relevance-reranker';
 
@@ -33,7 +36,9 @@ export class CohereRelevanceReranker implements RelevanceReranker {
     }
 
     const model = this.config.get<string>('COHERE_RERANK_MODEL') ?? 'rerank-v3.5';
-    const timeoutMs = Number(this.config.get<string>('RAG_RERANK_TIMEOUT_MS') ?? 10_000);
+    const timeoutMs = Number(
+      this.config.get<string>('RAG_RERANK_TIMEOUT_MS') ?? 10_000,
+    );
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -61,12 +66,26 @@ export class CohereRelevanceReranker implements RelevanceReranker {
         results?: Array<{ index: number; relevance_score: number }>;
       };
 
-      return (payload.results ?? [])
-        .map((item) => {
-          const hit = hits[item.index];
-          return hit ? { ...hit, score: item.relevance_score } : undefined;
-        })
-        .filter((hit): hit is SearchHit => Boolean(hit));
+      if (!Array.isArray(payload.results)) {
+        throw new InvalidProviderResponseError(
+          'Cohere rerank response did not contain a results array',
+        );
+      }
+
+      return payload.results.map((item) => {
+        if (
+          !Number.isInteger(item.index) ||
+          item.index < 0 ||
+          item.index >= hits.length ||
+          !Number.isFinite(item.relevance_score)
+        ) {
+          throw new InvalidProviderResponseError(
+            'Cohere rerank response contained an invalid result item',
+          );
+        }
+
+        return { ...hits[item.index], score: item.relevance_score };
+      });
     } catch (error) {
       throw new ExternalProviderError(
         'cohere-rerank',

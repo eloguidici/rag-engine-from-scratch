@@ -25,6 +25,11 @@ export interface IngestionResult {
   duplicate: boolean;
 }
 
+export interface DeleteDocumentResult {
+  documentId: string;
+  deleted: boolean;
+}
+
 export interface IngestionInput extends Omit<SourceDocument, 'id'> {
   id?: string;
   format?: DocumentFormat;
@@ -115,6 +120,21 @@ export class RagService {
       version: revision.version,
       duplicate: false,
     };
+  }
+
+  async deleteDocument(documentId: string): Promise<DeleteDocumentResult> {
+    const deleted = await this.store.deleteByDocumentId(documentId);
+    if (deleted) this.revisions.remove(documentId);
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'rag.document.deleted',
+        documentId,
+        deleted,
+      }),
+    );
+
+    return { documentId, deleted };
   }
 
   /** Retrieves evidence and returns a grounded answer with citations. */

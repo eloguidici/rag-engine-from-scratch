@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { EmbeddedChunk, SearchHit } from '../domain/models';
 import { EMBEDDING_PROVIDER, EmbeddingProvider, VECTOR_STORE, VectorStore } from '../domain/ports';
 import {
+  RELEVANCE_RERANKER,
+  RelevanceReranker,
+} from '../domain/relevance-reranker';
+import {
   RETRIEVAL_FUSION_STRATEGY,
   RetrievalFusionStrategy,
 } from '../domain/retrieval-fusion.strategy';
@@ -12,7 +16,7 @@ import {
   RetrievalScoringStrategy,
 } from '../domain/retrieval-scoring.strategy';
 
-/** Coordinates candidate generation, fusion, thresholding, and reranking. */
+/** Coordinates candidate generation, fusion, relevance reranking, thresholding, and diversity. */
 @Injectable()
 export class RetrievalService {
   constructor(
@@ -23,6 +27,9 @@ export class RetrievalService {
     @Optional()
     @Inject(RETRIEVAL_FUSION_STRATEGY)
     private readonly fusionStrategy?: RetrievalFusionStrategy,
+    @Optional()
+    @Inject(RELEVANCE_RERANKER)
+    private readonly relevanceReranker?: RelevanceReranker,
     @Optional()
     @Inject(RERANKER)
     private readonly reranker?: Reranker,
@@ -64,9 +71,13 @@ export class RetrievalService {
       ? this.fusionStrategy.fuse(candidates)
       : candidates;
 
+    const relevanceRanked = this.relevanceReranker
+      ? await this.relevanceReranker.rerank(query, fused, candidateLimit)
+      : fused;
+
     return this.reranker
-      ? this.reranker.rerank(fused, topK)
-      : fused.slice(0, topK);
+      ? this.reranker.rerank(relevanceRanked, topK)
+      : relevanceRanked.slice(0, topK);
   }
 
   private applyMetadataFilters(

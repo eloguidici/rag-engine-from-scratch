@@ -1,22 +1,30 @@
-import { Injectable } from '@nestjs/common';
-
-interface RevisionState {
-  contentHash: string;
-  version: number;
-}
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import {
+  DOCUMENT_REVISION_REPOSITORY,
+  DocumentRevisionRepository,
+} from '../domain/document-revision.repository';
+import { InMemoryDocumentRevisionRepository } from '../infrastructure/in-memory-document-revision.repository';
 
 export interface RevisionDecision {
   duplicate: boolean;
   version: number;
 }
 
-/** Tracks in-memory document revisions for duplicate detection and reindexing. */
+/** Coordinates duplicate detection and revision persistence. */
 @Injectable()
 export class DocumentRevisionService {
-  private readonly revisions = new Map<string, RevisionState>();
+  private readonly repository: DocumentRevisionRepository;
 
-  evaluate(documentId: string, contentHash: string): RevisionDecision {
-    const current = this.revisions.get(documentId);
+  constructor(
+    @Optional()
+    @Inject(DOCUMENT_REVISION_REPOSITORY)
+    repository?: DocumentRevisionRepository,
+  ) {
+    this.repository = repository ?? new InMemoryDocumentRevisionRepository();
+  }
+
+  async evaluate(documentId: string, contentHash: string): Promise<RevisionDecision> {
+    const current = await this.repository.get(documentId);
     if (current?.contentHash === contentHash) {
       return { duplicate: true, version: current.version };
     }
@@ -27,11 +35,11 @@ export class DocumentRevisionService {
     };
   }
 
-  commit(documentId: string, contentHash: string, version: number): void {
-    this.revisions.set(documentId, { contentHash, version });
+  commit(documentId: string, contentHash: string, version: number): Promise<void> {
+    return this.repository.save(documentId, { contentHash, version });
   }
 
-  remove(documentId: string): void {
-    this.revisions.delete(documentId);
+  remove(documentId: string): Promise<void> {
+    return this.repository.delete(documentId);
   }
 }

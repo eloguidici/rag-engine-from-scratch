@@ -10,7 +10,7 @@ export interface EmbeddingProvider {
 
 export interface VectorStore {
   upsert(chunks: EmbeddedChunk[]): Promise<void>;
-  deleteByDocumentId(documentId: string): Promise<void>;
+  deleteByDocumentId(documentId: string): Promise<boolean>;
   semanticSearch(queryVector: number[], topK: number): Promise<SearchHit[]>;
   all(): Promise<EmbeddedChunk[]>;
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { RagController } from './api/rag.controller';
+import { DeleteDocumentHandler } from './application/commands/delete-document.handler';
 import { IngestDocumentHandler } from './application/commands/ingest-document.handler';
 import { ContextBuilderService } from './application/context-builder.service';
 import { DocumentIngestionService } from './application/document-ingestion.service';
@@ -33,7 +34,7 @@ import { ReciprocalRankFusionStrategy } from './infrastructure/reciprocal-rank-f
 import { RecursiveChunkingStrategy } from './infrastructure/recursive-chunking.strategy';
 import { WeightedHybridScoringStrategy } from './infrastructure/weighted-hybrid-scoring.strategy';
 
-const commandHandlers = [IngestDocumentHandler];
+const commandHandlers = [IngestDocumentHandler, DeleteDocumentHandler];
 const queryHandlers = [AskRagHandler];
 
 @Module({

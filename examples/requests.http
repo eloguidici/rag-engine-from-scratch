@@ -1,0 +1,27 @@
+### Health
+GET http://localhost:3000/health
+
+### Ingest sample document
+POST http://localhost:3000/rag/documents
+Content-Type: application/json
+
+{
+  "id": "finance-1",
+  "title": "Finance Notes",
+  "content": "The invoice payment is pending approval by finance.",
+  "metadata": {
+    "department": "finance"
+  }
+}
+
+### Ask with metadata filter
+POST http://localhost:3000/rag/query
+Content-Type: application/json
+
+{
+  "question": "What is the invoice payment status?",
+  "topK": 5,
+  "filters": {
+    "department": "finance"
+  }
+}

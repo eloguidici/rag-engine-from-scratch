@@ -9,6 +9,7 @@ import { RagService } from './application/rag.service';
 import { RetrievalService } from './application/retrieval.service';
 import { AskRagHandler } from './application/queries/ask-rag.handler';
 import { TextChunkerService } from './application/text-chunker.service';
+import { CHUNKING_STRATEGY } from './domain/chunking-strategy';
 import {
   EMBEDDING_PROVIDER,
   GENERATION_PROVIDER,
@@ -29,6 +30,7 @@ import {
   OpenAIGenerationProvider,
 } from './infrastructure/openai.providers';
 import { ReciprocalRankFusionStrategy } from './infrastructure/reciprocal-rank-fusion.strategy';
+import { RecursiveChunkingStrategy } from './infrastructure/recursive-chunking.strategy';
 import { WeightedHybridScoringStrategy } from './infrastructure/weighted-hybrid-scoring.strategy';
 
 const commandHandlers = [IngestDocumentHandler];
@@ -49,6 +51,7 @@ const queryHandlers = [AskRagHandler];
     HtmlDocumentLoader,
     ...commandHandlers,
     ...queryHandlers,
+    { provide: CHUNKING_STRATEGY, useClass: RecursiveChunkingStrategy },
     { provide: EMBEDDING_PROVIDER, useClass: OpenAIEmbeddingProvider },
     { provide: GENERATION_PROVIDER, useClass: OpenAIGenerationProvider },
     { provide: VECTOR_STORE, useClass: InMemoryVectorStore },

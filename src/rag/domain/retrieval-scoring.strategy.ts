@@ -6,6 +6,7 @@ export const RETRIEVAL_SCORING_STRATEGY = Symbol('RETRIEVAL_SCORING_STRATEGY');
 export interface RetrievalScoreInput {
   query: string;
   chunk: Chunk;
+  corpus: Chunk[];
   semanticScore: number;
 }
 

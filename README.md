@@ -6,6 +6,7 @@ The project keeps the important RAG mechanics explicit and replaceable: ingestio
 
 ## Repository guide
 
+- [API guide and curl examples](docs/API.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Architecture decisions](docs/DECISIONS.md)
 - [Retrieval evaluation](docs/EVALUATION.md)
@@ -119,6 +120,7 @@ database/
 └── init.sql
 
 docs/
+├── API.md
 ├── ARCHITECTURE.md
 ├── DECISIONS.md
 ├── ENGINEERING-NOTES.md
@@ -221,6 +223,24 @@ POSTGRES_POOL_MAX=10
 
 Docker Compose starts the API and a pgvector-enabled PostgreSQL instance and initializes `database/init.sql`.
 
+## Try the API
+
+Interactive OpenAPI documentation is available through Swagger UI once the application is running:
+
+```text
+http://localhost:3000/docs
+```
+
+Swagger exposes the request schemas, validation constraints, multipart upload contract and executable operations for the RAG endpoints.
+
+For copy/paste examples, expected response shapes, validation behavior, error envelopes and request-correlation examples, see **[docs/API.md](docs/API.md)**.
+
+A quick manual path is:
+
+```text
+start API -> open /docs -> ingest a document -> query it -> inspect citations -> delete it
+```
+
 ## Running locally
 
 Requirements:
@@ -295,6 +315,8 @@ curl -X POST http://localhost:3000/rag/query \
 ```bash
 curl -X DELETE http://localhost:3000/rag/documents/architecture-notes
 ```
+
+For the complete endpoint guide, file-upload example, response contracts and error behavior, see [docs/API.md](docs/API.md).
 
 ## Configuration
 

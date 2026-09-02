@@ -18,15 +18,30 @@ export interface BuiltContext {
  */
 @Injectable()
 export class ContextBuilderService {
+  private readonly maxContextCharacters = 12_000;
+
   build(hits: SearchHit[]): BuiltContext {
-    const context = hits
+    const selected: SearchHit[] = [];
+    let usedCharacters = 0;
+
+    for (const hit of hits) {
+      const title = String(hit.chunk.metadata.title ?? hit.chunk.documentId);
+      const sectionLength = title.length + hit.chunk.text.length + 16;
+      if (selected.length > 0 && usedCharacters + sectionLength > this.maxContextCharacters) {
+        break;
+      }
+      selected.push(hit);
+      usedCharacters += sectionLength;
+    }
+
+    const context = selected
       .map((hit, index) => {
         const title = String(hit.chunk.metadata.title ?? hit.chunk.documentId);
         return `[S${index + 1}] ${title}\n${hit.chunk.text}`;
       })
       .join('\n\n');
 
-    const sources = hits.map((hit) => ({
+    const sources = selected.map((hit) => ({
       documentId: hit.chunk.documentId,
       chunkId: hit.chunk.id,
       title: String(hit.chunk.metadata.title ?? ''),

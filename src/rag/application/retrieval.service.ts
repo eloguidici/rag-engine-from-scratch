@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SearchHit } from '../domain/models';
+import { EmbeddedChunk, SearchHit } from '../domain/models';
 import { EMBEDDING_PROVIDER, EmbeddingProvider, VECTOR_STORE, VectorStore } from '../domain/ports';
 import {
   RETRIEVAL_SCORING_STRATEGY,
@@ -17,10 +17,14 @@ export class RetrievalService {
   ) {}
 
   /** Returns the highest-ranked chunks for a natural-language query. */
-  async search(query: string, topK: number): Promise<SearchHit[]> {
+  async search(
+    query: string,
+    topK: number,
+    filters?: Record<string, string | number | boolean>,
+  ): Promise<SearchHit[]> {
     const [queryVector] = await this.embeddings.embed([query]);
-    const semantic = await this.store.semanticSearch(queryVector, Math.max(topK * 3, topK));
-    const all = await this.store.all();
+    const semantic = await this.store.semanticSearch(queryVector, Math.max(topK * 5, topK));
+    const all = this.applyMetadataFilters(await this.store.all(), filters);
     const semanticById = new Map(semantic.map((hit) => [hit.chunk.id, hit.semanticScore]));
 
     return all
@@ -36,5 +40,16 @@ export class RetrievalService {
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, topK);
+  }
+
+  private applyMetadataFilters(
+    chunks: EmbeddedChunk[],
+    filters?: Record<string, string | number | boolean>,
+  ): EmbeddedChunk[] {
+    if (!filters || Object.keys(filters).length === 0) return chunks;
+
+    return chunks.filter((chunk) =>
+      Object.entries(filters).every(([key, expected]) => chunk.metadata[key] === expected),
+    );
   }
 }

@@ -46,9 +46,9 @@ class FakeVectorStore implements VectorStore {
     return Promise.resolve();
   }
 
-  deleteByDocumentId(documentId: string): Promise<void> {
+  deleteByDocumentId(documentId: string): Promise<boolean> {
     void documentId;
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
 
   all(): Promise<EmbeddedChunk[]> {

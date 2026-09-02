@@ -58,5 +58,8 @@ export function validateEnvironment(
     }
   }
 
-  return { ...(config as EnvironmentVariables), OPENAI_API_KEY: openAiApiKey };
+  return {
+    ...config,
+    OPENAI_API_KEY: openAiApiKey,
+  } as unknown as EnvironmentVariables;
 }

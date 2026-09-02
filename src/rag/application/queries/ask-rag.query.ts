@@ -3,5 +3,6 @@ export class AskRagQuery {
   constructor(
     public readonly question: string,
     public readonly topK?: number,
+    public readonly filters?: Record<string, string | number | boolean>,
   ) {}
 }

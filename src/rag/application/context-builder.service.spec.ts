@@ -1,5 +1,5 @@
-import { ContextBuilderService } from './context-builder.service';
 import { SearchHit } from '../domain/models';
+import { ContextBuilderService } from './context-builder.service';
 
 describe('ContextBuilderService', () => {
   const service = new ContextBuilderService();
@@ -12,7 +12,6 @@ describe('ContextBuilderService', () => {
           documentId: 'doc-1',
           text: 'RAG combines retrieval and generation.',
           metadata: { title: 'Architecture Notes' },
-          vector: [1, 0],
         },
         semanticScore: 0.9,
         keywordScore: 0.5,

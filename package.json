@@ -4,6 +4,9 @@
   "description": "A production-minded RAG engine built from first principles with NestJS and TypeScript, without LangChain or LlamaIndex.",
   "private": false,
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "nest build",
     "start": "nest start",

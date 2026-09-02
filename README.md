@@ -8,6 +8,23 @@ The project keeps the important RAG mechanics explicit and replaceable: ingestio
 
 RAG frameworks are useful, but they can hide the mechanics that matter when a system has to be debugged, evaluated, optimized, secured or adapted to production constraints. This implementation keeps those mechanics visible so each stage can be reasoned about, measured, replaced and tested independently.
 
+## What this project demonstrates
+
+This repository is intentionally designed as an architecture and engineering portfolio piece. It demonstrates:
+
+- clean separation between API, application, domain and infrastructure concerns;
+- CQRS where command/query separation adds clarity rather than ceremony;
+- dependency inversion through ports and replaceable adapters;
+- hybrid semantic + lexical retrieval, Reciprocal Rank Fusion and reranking;
+- durable PostgreSQL + pgvector persistence alongside deterministic in-memory adapters;
+- document versioning, duplicate detection and stable re-indexing behavior;
+- bounded, citation-aware generation with retrieved context treated as untrusted input;
+- deterministic retrieval evaluation with Recall@K, MRR and nDCG@K;
+- production-minded observability, provider timeouts/retries and fail-fast configuration;
+- CI that validates lint, tests, build and real PostgreSQL/pgvector integration behavior.
+
+The goal is not to imitate a full SaaS platform. It is to make the engineering decisions behind a serious RAG backend visible, testable and defensible in a technical review.
+
 ## Architecture
 
 ```mermaid
@@ -87,6 +104,11 @@ docs/
 ├── EVALUATION.md
 ├── PRODUCTION-READINESS.md
 └── RETRIEVAL.md
+
+examples/
+├── demo.sh                   # Reproducible ingest -> query -> citations flow
+└── evaluation/
+    └── retrieval-dataset.json
 ```
 
 ## Ingestion lifecycle
@@ -183,6 +205,20 @@ Set `OPENAI_API_KEY` in `.env`, then:
 cp .env.example .env
 # change RAG_PERSISTENCE=postgres
 docker compose up --build
+```
+
+## Quick end-to-end demo
+
+With the API running, execute:
+
+```bash
+bash examples/demo.sh
+```
+
+The script performs a health check, ingests a small document, asks a grounded question using a metadata filter, returns the answer with the retrieved citations, and deletes the demo document. Set `BASE_URL` to point it at another environment:
+
+```bash
+BASE_URL=http://localhost:3000 bash examples/demo.sh
 ```
 
 ## API examples

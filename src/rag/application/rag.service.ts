@@ -58,9 +58,13 @@ export class RagService {
    * Retrieves relevant evidence, constrains the generation context and returns
    * an answer together with the exact chunks used as citations.
    */
-  async query(question: string, requestedTopK?: number): Promise<RagAnswer> {
+  async query(
+    question: string,
+    requestedTopK?: number,
+    filters?: Record<string, string | number | boolean>,
+  ): Promise<RagAnswer> {
     const topK = requestedTopK ?? Number(this.config.get('RAG_TOP_K') ?? 6);
-    const hits = await this.retrieval.search(question, topK);
+    const hits = await this.retrieval.search(question, topK, filters);
     const { context, sources } = this.contextBuilder.build(hits);
     const answer = await this.generator.generate(question, context);
 

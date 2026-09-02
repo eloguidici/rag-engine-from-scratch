@@ -73,7 +73,14 @@ describe('CohereRelevanceReranker', () => {
       Authorization: 'Bearer test-key',
       'Content-Type': 'application/json',
     });
-    expect(JSON.parse(String(request?.body))).toMatchObject({
+
+    const body = request?.body;
+    expect(typeof body).toBe('string');
+    if (typeof body !== 'string') {
+      throw new Error('Expected a JSON string request body');
+    }
+
+    expect(JSON.parse(body)).toMatchObject({
       query: 'evidence',
       top_n: 2,
       documents: ['First evidence chunk', 'Second evidence chunk'],

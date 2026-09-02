@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { RagController } from './api/rag.controller';
 import { IngestDocumentHandler } from './application/commands/ingest-document.handler';
+import { ContextBuilderService } from './application/context-builder.service';
 import { RagService } from './application/rag.service';
 import { RetrievalService } from './application/retrieval.service';
 import { AskRagHandler } from './application/queries/ask-rag.handler';
@@ -28,13 +29,17 @@ const queryHandlers = [AskRagHandler];
   providers: [
     RagService,
     RetrievalService,
+    ContextBuilderService,
     TextChunkerService,
     ...commandHandlers,
     ...queryHandlers,
     { provide: EMBEDDING_PROVIDER, useClass: OpenAIEmbeddingProvider },
     { provide: GENERATION_PROVIDER, useClass: OpenAIGenerationProvider },
     { provide: VECTOR_STORE, useClass: InMemoryVectorStore },
-    { provide: RETRIEVAL_SCORING_STRATEGY, useClass: WeightedHybridScoringStrategy },
+    {
+      provide: RETRIEVAL_SCORING_STRATEGY,
+      useClass: WeightedHybridScoringStrategy,
+    },
   ],
 })
 export class RagModule {}

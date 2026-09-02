@@ -9,7 +9,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   private readonly client: OpenAI;
 
   constructor(private readonly config: ConfigService) {
-    this.client = new OpenAI({ apiKey: this.config.get<string>('OPENAI_API_KEY') });
+    this.client = createOpenAIClient(this.config);
   }
 
   async embed(texts: string[]): Promise<number[][]> {
@@ -38,7 +38,7 @@ export class OpenAIGenerationProvider implements GenerationProvider {
   private readonly client: OpenAI;
 
   constructor(private readonly config: ConfigService) {
-    this.client = new OpenAI({ apiKey: this.config.get<string>('OPENAI_API_KEY') });
+    this.client = createOpenAIClient(this.config);
   }
 
   async generate(question: string, context: string): Promise<string> {
@@ -73,4 +73,12 @@ export class OpenAIGenerationProvider implements GenerationProvider {
       );
     }
   }
+}
+
+function createOpenAIClient(config: ConfigService): OpenAI {
+  return new OpenAI({
+    apiKey: config.get<string>('OPENAI_API_KEY'),
+    timeout: Number(config.get<string>('OPENAI_TIMEOUT_MS') ?? 30_000),
+    maxRetries: Number(config.get<string>('OPENAI_MAX_RETRIES') ?? 2),
+  });
 }

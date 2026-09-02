@@ -39,6 +39,27 @@ export class IngestDocumentDto {
   metadata?: Record<string, string | number | boolean>;
 }
 
+/** Multipart fields accompanying a document file upload. */
+export class UploadDocumentDto {
+  @ApiProperty({ example: 'Architecture Notes' })
+  @IsString()
+  @MinLength(1)
+  title!: string;
+
+  @ApiPropertyOptional({ description: 'Optional stable document identifier.' })
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional JSON object merged with extracted file metadata.',
+    example: '{"department":"architecture"}',
+  })
+  @IsOptional()
+  @IsString()
+  metadata?: string;
+}
+
 /** Request payload used to execute a RAG query against indexed content. */
 export class QueryRagDto {
   @ApiProperty({ example: 'How does the retrieval pipeline work?' })

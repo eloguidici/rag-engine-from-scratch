@@ -6,16 +6,17 @@ import { VectorStore } from '../domain/ports';
 export class InMemoryVectorStore implements VectorStore {
   private readonly chunks = new Map<string, EmbeddedChunk>();
 
-  async upsert(chunks: EmbeddedChunk[]): Promise<void> {
+  upsert(chunks: EmbeddedChunk[]): Promise<void> {
     for (const chunk of chunks) this.chunks.set(chunk.id, chunk);
+    return Promise.resolve();
   }
 
-  async all(): Promise<EmbeddedChunk[]> {
-    return [...this.chunks.values()];
+  all(): Promise<EmbeddedChunk[]> {
+    return Promise.resolve([...this.chunks.values()]);
   }
 
-  async semanticSearch(queryVector: number[], topK: number): Promise<SearchHit[]> {
-    return [...this.chunks.values()]
+  semanticSearch(queryVector: number[], topK: number): Promise<SearchHit[]> {
+    const results = [...this.chunks.values()]
       .map((chunk) => ({
         chunk,
         semanticScore: this.cosineSimilarity(queryVector, chunk.vector),
@@ -24,6 +25,8 @@ export class InMemoryVectorStore implements VectorStore {
       }))
       .sort((a, b) => b.semanticScore - a.semanticScore)
       .slice(0, topK);
+
+    return Promise.resolve(results);
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {

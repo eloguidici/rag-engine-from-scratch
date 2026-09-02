@@ -75,6 +75,7 @@ describe('RetrievalService', () => {
       new FakeVectorStore(),
       new WeightedHybridScoringStrategy(),
       new ReciprocalRankFusionStrategy(),
+      undefined,
       new DiversityReranker(),
       new ConfigService({ RAG_CANDIDATE_MULTIPLIER: 4, RAG_MIN_SCORE: 0.01 }),
     );
@@ -93,6 +94,7 @@ describe('RetrievalService', () => {
       new FakeEmbeddingProvider(),
       new FakeVectorStore(),
       new WeightedHybridScoringStrategy(),
+      undefined,
       undefined,
       undefined,
       new ConfigService({ RAG_CANDIDATE_MULTIPLIER: 2, RAG_MIN_SCORE: 0.99 }),

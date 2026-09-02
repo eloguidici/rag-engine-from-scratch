@@ -62,7 +62,7 @@ export class RagService {
       format: input.format ?? 'text',
       metadata: input.metadata,
     });
-    const revision = this.revisions.evaluate(documentId, contentHash);
+    const revision = await this.revisions.evaluate(documentId, contentHash);
 
     if (revision.duplicate) {
       this.logger.log(
@@ -102,7 +102,7 @@ export class RagService {
     await this.store.upsert(
       chunks.map((chunk, index) => ({ ...chunk, vector: vectors[index] })),
     );
-    this.revisions.commit(documentId, contentHash, revision.version);
+    await this.revisions.commit(documentId, contentHash, revision.version);
 
     this.logger.log(
       JSON.stringify({
@@ -124,7 +124,7 @@ export class RagService {
 
   async deleteDocument(documentId: string): Promise<DeleteDocumentResult> {
     const deleted = await this.store.deleteByDocumentId(documentId);
-    if (deleted) this.revisions.remove(documentId);
+    if (deleted) await this.revisions.remove(documentId);
 
     this.logger.log(
       JSON.stringify({

@@ -59,7 +59,23 @@ export function validateEnvironment(
   }
 
   return {
-    ...config,
+    PORT: optionalString(config.PORT),
     OPENAI_API_KEY: openAiApiKey,
-  } as unknown as EnvironmentVariables;
+    OPENAI_EMBEDDING_MODEL: optionalString(config.OPENAI_EMBEDDING_MODEL),
+    OPENAI_CHAT_MODEL: optionalString(config.OPENAI_CHAT_MODEL),
+    RAG_CHUNK_SIZE: optionalString(config.RAG_CHUNK_SIZE),
+    RAG_CHUNK_OVERLAP: optionalString(config.RAG_CHUNK_OVERLAP),
+    RAG_CHUNK_MAX_TOKENS: optionalString(config.RAG_CHUNK_MAX_TOKENS),
+    RAG_TOP_K: optionalString(config.RAG_TOP_K),
+    RAG_MAX_CONTEXT_CHARS: optionalString(config.RAG_MAX_CONTEXT_CHARS),
+    RAG_CANDIDATE_MULTIPLIER: optionalString(config.RAG_CANDIDATE_MULTIPLIER),
+    RAG_MIN_SCORE: optionalString(config.RAG_MIN_SCORE),
+  };
+}
+
+function optionalString(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return undefined;
 }

@@ -11,6 +11,13 @@ export class InMemoryVectorStore implements VectorStore {
     return Promise.resolve();
   }
 
+  deleteByDocumentId(documentId: string): Promise<void> {
+    for (const [chunkId, chunk] of this.chunks.entries()) {
+      if (chunk.documentId === documentId) this.chunks.delete(chunkId);
+    }
+    return Promise.resolve();
+  }
+
   all(): Promise<EmbeddedChunk[]> {
     return Promise.resolve([...this.chunks.values()]);
   }

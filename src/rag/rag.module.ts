@@ -8,9 +8,9 @@ import { IngestDocumentHandler } from './application/commands/ingest-document.ha
 import { ContextBuilderService } from './application/context-builder.service';
 import { DocumentIngestionService } from './application/document-ingestion.service';
 import { DocumentRevisionService } from './application/document-revision.service';
+import { AskRagHandler } from './application/queries/ask-rag.handler';
 import { RagService } from './application/rag.service';
 import { RetrievalService } from './application/retrieval.service';
-import { AskRagHandler } from './application/queries/ask-rag.handler';
 import { TextChunkerService } from './application/text-chunker.service';
 import { CHUNKING_STRATEGY } from './domain/chunking-strategy';
 import { DOCUMENT_FILE_EXTRACTOR } from './domain/document-file-extractor';
@@ -36,6 +36,7 @@ import {
 import { InMemoryDocumentRevisionRepository } from './infrastructure/in-memory-document-revision.repository';
 import { InMemoryVectorStore } from './infrastructure/in-memory-vector-store';
 import { ManagedPostgresPool } from './infrastructure/managed-postgres-pool';
+import { ModelProviderFactory } from './infrastructure/model-provider.factory';
 import {
   OpenAIEmbeddingProvider,
   OpenAIGenerationProvider,
@@ -62,6 +63,7 @@ const queryHandlers = [AskRagHandler];
     TextChunkerService,
     DocumentIngestionService,
     DocumentRevisionService,
+    ModelProviderFactory,
     ProviderExecutionPolicy,
     PlainTextDocumentLoader,
     MarkdownDocumentLoader,

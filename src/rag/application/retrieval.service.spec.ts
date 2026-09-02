@@ -34,13 +34,15 @@ const chunks: EmbeddedChunk[] = [
 ];
 
 class FakeEmbeddingProvider implements EmbeddingProvider {
-  embed(_texts: string[]): Promise<number[][]> {
+  embed(texts: string[]): Promise<number[][]> {
+    void texts;
     return Promise.resolve([[1, 0]]);
   }
 }
 
 class FakeVectorStore implements VectorStore {
-  upsert(_chunks: EmbeddedChunk[]): Promise<void> {
+  upsert(chunksToStore: EmbeddedChunk[]): Promise<void> {
+    void chunksToStore;
     return Promise.resolve();
   }
 

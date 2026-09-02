@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import { DocumentFormat } from '../domain/document-loader';
 import { InvalidProviderResponseError } from '../domain/errors';
 import { RagAnswer, SourceDocument } from '../domain/models';
 import {
@@ -12,12 +13,21 @@ import {
   VectorStore,
 } from '../domain/ports';
 import { ContextBuilderService } from './context-builder.service';
+import { DocumentIngestionService } from './document-ingestion.service';
+import { DocumentRevisionService } from './document-revision.service';
 import { RetrievalService } from './retrieval.service';
 import { TextChunkerService } from './text-chunker.service';
 
 export interface IngestionResult {
   documentId: string;
   chunksIndexed: number;
+  version: number;
+  duplicate: boolean;
+}
+
+export interface IngestionInput extends Omit<SourceDocument, 'id'> {
+  id?: string;
+  format?: DocumentFormat;
 }
 
 @Injectable()
@@ -28,19 +38,53 @@ export class RagService {
     private readonly chunker: TextChunkerService,
     private readonly retrieval: RetrievalService,
     private readonly contextBuilder: ContextBuilderService,
+    private readonly ingestion: DocumentIngestionService,
+    private readonly revisions: DocumentRevisionService,
     private readonly config: ConfigService,
     @Inject(EMBEDDING_PROVIDER) private readonly embeddings: EmbeddingProvider,
     @Inject(VECTOR_STORE) private readonly store: VectorStore,
     @Inject(GENERATION_PROVIDER) private readonly generator: GenerationProvider,
   ) {}
 
-  /** Normalizes, chunks, embeds and indexes one source document. */
-  async ingest(
-    input: Omit<SourceDocument, 'id'> & { id?: string },
-  ): Promise<IngestionResult> {
+  /** Normalizes, versions, chunks, embeds and indexes one source document. */
+  async ingest(input: IngestionInput): Promise<IngestionResult> {
     const startedAt = Date.now();
-    const document: SourceDocument = { ...input, id: input.id ?? randomUUID() };
-    const chunks = this.chunker.chunk(document);
+    const documentId = input.id ?? randomUUID();
+    const { document, contentHash } = this.ingestion.prepare({
+      id: documentId,
+      title: input.title,
+      content: input.content,
+      format: input.format ?? 'text',
+      metadata: input.metadata,
+    });
+    const revision = this.revisions.evaluate(documentId, contentHash);
+
+    if (revision.duplicate) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'rag.ingest.duplicate',
+          documentId,
+          version: revision.version,
+          durationMs: Date.now() - startedAt,
+        }),
+      );
+      return {
+        documentId,
+        chunksIndexed: 0,
+        version: revision.version,
+        duplicate: true,
+      };
+    }
+
+    const versionedDocument: SourceDocument = {
+      ...document,
+      metadata: {
+        ...(document.metadata ?? {}),
+        version: revision.version,
+        contentHash,
+      },
+    };
+    const chunks = this.chunker.chunk(versionedDocument);
     const vectors = await this.embeddings.embed(chunks.map((chunk) => chunk.text));
 
     if (vectors.length !== chunks.length) {
@@ -49,20 +93,28 @@ export class RagService {
       );
     }
 
+    await this.store.deleteByDocumentId(documentId);
     await this.store.upsert(
       chunks.map((chunk, index) => ({ ...chunk, vector: vectors[index] })),
     );
+    this.revisions.commit(documentId, contentHash, revision.version);
 
     this.logger.log(
       JSON.stringify({
         event: 'rag.ingest.completed',
-        documentId: document.id,
+        documentId,
         chunksIndexed: chunks.length,
+        version: revision.version,
         durationMs: Date.now() - startedAt,
       }),
     );
 
-    return { documentId: document.id, chunksIndexed: chunks.length };
+    return {
+      documentId,
+      chunksIndexed: chunks.length,
+      version: revision.version,
+      duplicate: false,
+    };
   }
 
   /** Retrieves evidence and returns a grounded answer with citations. */

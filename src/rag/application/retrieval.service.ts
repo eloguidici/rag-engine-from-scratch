@@ -33,6 +33,7 @@ export class RetrievalService {
         const { keywordScore, finalScore } = this.scoringStrategy.score({
           query,
           chunk,
+          corpus: all,
           semanticScore,
         });
 

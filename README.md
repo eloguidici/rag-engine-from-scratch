@@ -2,7 +2,7 @@
 
 A production-minded Retrieval-Augmented Generation engine built with NestJS and TypeScript from first principles, without LangChain or LlamaIndex.
 
-The project keeps the important RAG mechanics explicit and replaceable: ingestion, normalization, chunking, embeddings, vector search, BM25, hybrid scoring, Reciprocal Rank Fusion, reranking, bounded context construction, generation, citations, file extraction, document revisions, persistence and evaluation.
+The project keeps the important RAG mechanics explicit and replaceable: ingestion, normalization, chunking, embeddings, vector search, BM25, hybrid scoring, Reciprocal Rank Fusion, query-aware relevance reranking, diversity reranking, bounded context construction, generation, citations, file extraction, document revisions, persistence and evaluation.
 
 ## Repository guide
 
@@ -27,14 +27,16 @@ This repository is intentionally designed as an architecture and engineering por
 - clean separation between API, application, domain and infrastructure concerns;
 - CQRS where command/query separation adds clarity rather than ceremony;
 - dependency inversion through ports and replaceable adapters;
-- hybrid semantic + lexical retrieval, Reciprocal Rank Fusion and reranking;
+- hybrid semantic + lexical retrieval, Reciprocal Rank Fusion and optional query-aware relevance reranking;
 - durable PostgreSQL + pgvector persistence alongside deterministic in-memory adapters;
 - document versioning, duplicate detection and stable re-indexing behavior;
 - bounded, citation-aware generation with retrieved context treated as untrusted input;
 - deterministic retrieval evaluation with Recall@K, MRR and nDCG@K;
+- reproducible ablation benchmarks across BM25, dense, hybrid and hybrid + RRF pipelines;
+- deterministic citation precision/coverage and insufficient-context refusal checks;
 - production-minded observability, provider timeouts/retries and fail-fast configuration;
 - reproducible dependency installation through a committed lockfile and `npm ci`;
-- CI that validates production dependency security, lint, tests, build and real PostgreSQL/pgvector integration behavior.
+- CI that validates production dependency security, lint, tests, retrieval benchmarks, build and real PostgreSQL/pgvector integration behavior.
 
 The goal is not to imitate a full SaaS platform. It is to make the engineering decisions behind a serious RAG backend visible, testable and defensible in a technical review.
 
@@ -56,13 +58,14 @@ flowchart LR
     SS --> HS[Weighted hybrid scoring]
     BM25 --> HS
     HS --> RRF[Reciprocal Rank Fusion]
-    RRF --> RR[Diversity reranker]
+    RRF --> SR[Optional relevance reranker]
+    SR --> RR[Diversity / dedupe reranker]
     RR --> CB[Bounded context]
     CB --> LLM[Generation provider]
-    LLM --> R[Answer + citations]
+    LLM --> R[Answer + citations / refusal]
 ```
 
-The application layer depends on ports rather than infrastructure implementations. Persistence can be switched with configuration without changing the use cases.
+The application layer depends on ports rather than infrastructure implementations. Persistence and relevance reranking can be switched with configuration without changing the use cases.
 
 ## Implemented capabilities
 
@@ -77,6 +80,8 @@ The application layer depends on ports rather than infrastructure implementation
 - BM25 + semantic hybrid retrieval.
 - Configurable candidate pool and relevance threshold.
 - Reciprocal Rank Fusion.
+- Optional query-aware relevance reranker behind a provider-agnostic port.
+- Cohere rerank adapter with timeout, response validation and provider error translation.
 - Diversity reranking and near-duplicate evidence removal.
 - Exact-match metadata filtering.
 - Bounded generation context.
@@ -87,7 +92,9 @@ The application layer depends on ports rather than infrastructure implementation
 - Request correlation id and structured HTTP latency logs.
 - Configurable OpenAI timeout and retry policy.
 - Deterministic retrieval evaluation metrics: Recall@K, MRR and nDCG@K.
-- GitHub Actions quality gate for audit, lint, tests, build and real pgvector persistence tests.
+- Deterministic citation precision/coverage and refusal evaluation helpers.
+- Reproducible retrieval ablation benchmark with p50/p95 latency reporting.
+- GitHub Actions quality gate for audit, lint, tests, benchmark, build and real pgvector persistence tests.
 
 ## Project structure
 
@@ -102,8 +109,8 @@ src/
 │   ├── api/                  # Controllers, DTOs and multipart transport
 │   ├── application/          # Use cases, CQRS handlers and orchestration
 │   ├── domain/               # Models, ports and strategy contracts
-│   ├── evaluation/           # Retrieval-quality metrics
-│   ├── infrastructure/       # OpenAI, pgvector, in-memory, PDF, BM25/RRF
+│   ├── evaluation/           # Retrieval/generation quality metrics + benchmark CLI
+│   ├── infrastructure/       # Providers, pgvector, in-memory, PDF, BM25/RRF/reranking
 │   └── rag.module.ts
 ├── app.module.ts
 └── main.ts
@@ -126,6 +133,8 @@ ai/
 examples/
 ├── demo.sh
 └── evaluation/
+    ├── benchmark-dataset.json
+    ├── benchmark-manifest.json
     └── retrieval-dataset.json
 ```
 
@@ -155,16 +164,38 @@ When `RAG_PERSISTENCE=postgres`, chunks and revision state survive application r
 5. Build weighted semantic + lexical scores.
 6. Apply the configured minimum score.
 7. Fuse rankings with Reciprocal Rank Fusion.
-8. Remove near-duplicate evidence and repeated chunks.
-9. Build a bounded context.
-10. Generate only from supplied evidence.
-11. Return the selected chunks as citations.
+8. Optionally apply a query-aware relevance reranker.
+9. Remove near-duplicate evidence and repeated chunks.
+10. Build a bounded context.
+11. Generate only from supplied evidence.
+12. Return the selected chunks as citations or explicitly refuse when evidence is insufficient.
 
 The weighted baseline is:
 
 ```text
 hybridScore = semanticScore * 0.72 + bm25Score * 0.28
 ```
+
+## Retrieval benchmark
+
+The repository contains a deterministic, provider-independent ablation benchmark. Run it with:
+
+```bash
+npm run benchmark:retrieval
+```
+
+The current `v1` seed dataset produces the following reference result in CI:
+
+| Pipeline | Recall@5 | MRR | nDCG@5 |
+| --- | ---: | ---: | ---: |
+| BM25 | 1.0000 | 1.0000 | 1.0000 |
+| Dense proxy | 1.0000 | 0.8000 | 0.8524 |
+| Hybrid | 1.0000 | 1.0000 | 1.0000 |
+| Hybrid + RRF | 1.0000 | 0.9000 | 0.9262 |
+
+The benchmark also reports p50 and p95 execution latency and records the dataset/configuration manifest. These numbers are intentionally **not** presented as universal model-quality claims: the built-in dense stage is a deterministic token-vector cosine proxy and the seed dataset is deliberately small. Its purpose is to make ranking changes measurable and to demonstrate ablation discipline without requiring an external model provider in CI.
+
+Runtime semantic retrieval still uses the configured embedding provider. The optional relevance reranker can be evaluated separately against a representative corpus before its added latency and provider dependency are accepted.
 
 ## Persistence
 
@@ -286,21 +317,26 @@ RAG_TOP_K=6
 RAG_MAX_CONTEXT_CHARS=12000
 RAG_CANDIDATE_MULTIPLIER=5
 RAG_MIN_SCORE=0
+
+RAG_RELEVANCE_RERANKER=none
+COHERE_API_KEY=
+COHERE_RERANK_MODEL=rerank-v3.5
+RAG_RERANK_TIMEOUT_MS=10000
 ```
 
-Critical configuration is validated before startup.
+Critical configuration is validated before startup. The external relevance reranker is disabled by default and only introduces an external dependency when explicitly enabled.
 
 ## Evaluation
 
-Retrieval-quality helpers implement Recall@K, Mean Reciprocal Rank (MRR) and nDCG@K. The metrics are deterministic, unit-tested and provider-independent. See `docs/EVALUATION.md` and `examples/evaluation/retrieval-dataset.json` for the evaluation workflow and dataset format.
+Retrieval-quality helpers implement Recall@K, Mean Reciprocal Rank (MRR) and nDCG@K. The metrics are deterministic, unit-tested and provider-independent. The benchmark compares retrieval variants rather than assuming additional stages improve ranking quality. See `docs/EVALUATION.md` and the versioned files under `examples/evaluation/` for the evaluation workflow and dataset format.
 
-Generation evaluation remains intentionally separate so retrieval metrics are not conflated with LLM judging. A production dataset should additionally measure groundedness, answer relevance, citation correctness and unsupported claims.
+Generation-quality helpers separately measure citation precision, citation coverage and insufficient-context refusal behavior. Production evaluation should additionally measure groundedness, answer relevance and unsupported claims over a representative versioned dataset.
 
 ## Observability and provider resilience
 
 Every HTTP request receives or propagates an `x-request-id`. Structured request logs include request id, method, path, HTTP status and duration.
 
-OpenAI clients use configurable request timeout and retry limits. Provider failures are translated into explicit domain errors rather than leaking SDK-specific exceptions through the application layer.
+OpenAI clients use configurable request timeout and retry limits. The optional Cohere relevance reranker also has a bounded timeout and validated response contract. Provider failures are translated into explicit domain errors rather than leaking provider-specific exceptions through the application layer.
 
 ## Testing and CI
 
@@ -311,11 +347,12 @@ npm ci
 npm audit --omit=dev --audit-level=high
 npm run lint
 npm test -- --runInBand
+npm run benchmark:retrieval
 npm run test:cov
 npm run build
 ```
 
-The GitHub Actions pipeline validates reproducible installation from `package-lock.json`, audits production dependencies for high/critical vulnerabilities, runs lint, unit/integration tests, real PostgreSQL/pgvector persistence tests and the production build.
+The GitHub Actions pipeline validates reproducible installation from `package-lock.json`, audits production dependencies for high/critical vulnerabilities, runs lint, unit/integration tests, real PostgreSQL/pgvector persistence tests, the deterministic retrieval benchmark and the production build.
 
 ## Security boundaries
 

@@ -13,6 +13,7 @@ export class IngestDocumentHandler implements ICommandHandler<IngestDocumentComm
       title: command.title,
       content: command.content,
       metadata: command.metadata,
+      format: command.format,
     });
   }
 }

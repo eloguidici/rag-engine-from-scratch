@@ -38,7 +38,8 @@ export class ReciprocalRankFusionStrategy implements RetrievalFusionStrategy {
     selector: (hit: SearchHit) => number,
   ): Map<string, number> {
     return new Map(
-      [...hits]
+      hits
+        .filter((hit) => selector(hit) > 0)
         .sort((a, b) => selector(b) - selector(a))
         .map((hit, index) => [hit.chunk.id, index + 1]),
     );

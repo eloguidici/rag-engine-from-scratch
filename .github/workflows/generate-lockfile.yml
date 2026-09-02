@@ -1,5 +1,6 @@
 name: Generate lockfile
 
+# One-time maintenance workflow used only on the final polish branch.
 on:
   push:
     branches: [chore/final-reproducibility-polish]

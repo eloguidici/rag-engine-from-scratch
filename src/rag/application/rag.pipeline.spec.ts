@@ -6,6 +6,7 @@ import {
   PlainTextDocumentLoader,
 } from '../infrastructure/document-loaders';
 import { InMemoryVectorStore } from '../infrastructure/in-memory-vector-store';
+import { RecursiveChunkingStrategy } from '../infrastructure/recursive-chunking.strategy';
 import { WeightedHybridScoringStrategy } from '../infrastructure/weighted-hybrid-scoring.strategy';
 import { ContextBuilderService } from './context-builder.service';
 import { DocumentIngestionService } from './document-ingestion.service';
@@ -45,6 +46,7 @@ describe('RAG pipeline', () => {
     const config = new ConfigService({
       RAG_CHUNK_SIZE: '500',
       RAG_CHUNK_OVERLAP: '50',
+      RAG_CHUNK_MAX_TOKENS: '125',
       RAG_TOP_K: '3',
     });
     const embeddings = new DeterministicEmbeddingProvider();
@@ -57,7 +59,7 @@ describe('RAG pipeline', () => {
       new HtmlDocumentLoader(),
     );
     const rag = new RagService(
-      new TextChunkerService(config),
+      new TextChunkerService(config, new RecursiveChunkingStrategy()),
       retrieval,
       new ContextBuilderService(),
       ingestion,

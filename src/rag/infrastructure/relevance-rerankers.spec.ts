@@ -142,13 +142,13 @@ describe('CohereRelevanceReranker', () => {
       config({ RAG_RERANK_TIMEOUT_MS: 5 }),
     );
     const promise = reranker.rerank('evidence', hits, 2);
-
-    await jest.advanceTimersByTimeAsync(5);
-
-    await expect(promise).rejects.toMatchObject({
+    const rejection = expect(promise).rejects.toMatchObject({
       name: 'ExternalProviderError',
       provider: 'cohere-rerank',
       message: 'Semantic reranking failed',
     });
+
+    await jest.advanceTimersByTimeAsync(5);
+    await rejection;
   });
 });

@@ -3,6 +3,8 @@ export interface EnvironmentVariables {
   OPENAI_API_KEY: string;
   OPENAI_EMBEDDING_MODEL?: string;
   OPENAI_CHAT_MODEL?: string;
+  OPENAI_TIMEOUT_MS?: string;
+  OPENAI_MAX_RETRIES?: string;
   RAG_CHUNK_SIZE?: string;
   RAG_CHUNK_OVERLAP?: string;
   RAG_CHUNK_MAX_TOKENS?: string;
@@ -27,6 +29,7 @@ export function validateEnvironment(
 
   const positiveIntegerKeys = [
     'PORT',
+    'OPENAI_TIMEOUT_MS',
     'RAG_CHUNK_SIZE',
     'RAG_CHUNK_MAX_TOKENS',
     'RAG_TOP_K',
@@ -38,6 +41,13 @@ export function validateEnvironment(
     const value = config[key];
     if (value !== undefined && (!Number.isInteger(Number(value)) || Number(value) <= 0)) {
       throw new Error(`${key} must be a positive integer`);
+    }
+  }
+
+  if (config.OPENAI_MAX_RETRIES !== undefined) {
+    const maxRetries = Number(config.OPENAI_MAX_RETRIES);
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+      throw new Error('OPENAI_MAX_RETRIES must be a non-negative integer');
     }
   }
 
@@ -77,6 +87,8 @@ export function validateEnvironment(
     OPENAI_API_KEY: openAiApiKey,
     OPENAI_EMBEDDING_MODEL: optionalString(config.OPENAI_EMBEDDING_MODEL),
     OPENAI_CHAT_MODEL: optionalString(config.OPENAI_CHAT_MODEL),
+    OPENAI_TIMEOUT_MS: optionalString(config.OPENAI_TIMEOUT_MS),
+    OPENAI_MAX_RETRIES: optionalString(config.OPENAI_MAX_RETRIES),
     RAG_CHUNK_SIZE: optionalString(config.RAG_CHUNK_SIZE),
     RAG_CHUNK_OVERLAP: optionalString(config.RAG_CHUNK_OVERLAP),
     RAG_CHUNK_MAX_TOKENS: optionalString(config.RAG_CHUNK_MAX_TOKENS),

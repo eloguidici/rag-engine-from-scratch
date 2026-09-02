@@ -2,262 +2,175 @@
 
 A production-minded Retrieval-Augmented Generation engine built with NestJS and TypeScript from first principles, without LangChain or LlamaIndex.
 
-The project keeps the important RAG mechanics explicit and replaceable: ingestion, normalization, chunking, embeddings, vector search, BM25, hybrid ranking, Reciprocal Rank Fusion, reranking, context construction, generation, citations, file extraction, versioning, and architectural boundaries.
+The project keeps the important RAG mechanics explicit and replaceable: ingestion, normalization, chunking, embeddings, vector search, BM25, hybrid scoring, Reciprocal Rank Fusion, reranking, bounded context construction, generation, citations, file extraction, document revisions, persistence and evaluation.
 
 ## Why this project exists
 
-RAG frameworks are useful, but they can hide the mechanics that matter when a system has to be debugged, evaluated, optimized, secured, or adapted to production constraints. This implementation keeps those mechanics visible so each stage can be reasoned about, measured, replaced, or scaled independently.
+RAG frameworks are useful, but they can hide the mechanics that matter when a system has to be debugged, evaluated, optimized, secured or adapted to production constraints. This implementation keeps those mechanics visible so each stage can be reasoned about, measured, replaced and tested independently.
+
+## What this project demonstrates
+
+This repository is intentionally designed as an architecture and engineering portfolio piece. It demonstrates:
+
+- clean separation between API, application, domain and infrastructure concerns;
+- CQRS where command/query separation adds clarity rather than ceremony;
+- dependency inversion through ports and replaceable adapters;
+- hybrid semantic + lexical retrieval, Reciprocal Rank Fusion and reranking;
+- durable PostgreSQL + pgvector persistence alongside deterministic in-memory adapters;
+- document versioning, duplicate detection and stable re-indexing behavior;
+- bounded, citation-aware generation with retrieved context treated as untrusted input;
+- deterministic retrieval evaluation with Recall@K, MRR and nDCG@K;
+- production-minded observability, provider timeouts/retries and fail-fast configuration;
+- CI that validates lint, tests, build and real PostgreSQL/pgvector integration behavior.
+
+The goal is not to imitate a full SaaS platform. It is to make the engineering decisions behind a serious RAG backend visible, testable and defensible in a technical review.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A[Inline Document or File Upload] --> B[Loader / Extractor]
-    B --> C[Normalization + Revision Hash]
-    C --> D[Chunking Strategy]
-    D --> E[Embedding Provider]
-    E --> F[Vector Store]
+    A[Inline content / upload] --> B[Loader / extractor]
+    B --> C[Normalization + revision hash]
+    C --> D[Chunking strategy]
+    D --> E[Embedding provider]
+    E --> V[VectorStore port]
+    V --> M[In-memory adapter]
+    V --> P[PostgreSQL + pgvector]
 
-    Q[Question] --> QE[Query Embedding]
-    QE --> SS[Semantic Search]
+    Q[Question] --> QE[Query embedding]
+    QE --> SS[Semantic search]
     Q --> BM25[BM25]
-    SS --> HY[Hybrid Scoring]
-    BM25 --> HY
-    HY --> RRF[Reciprocal Rank Fusion]
-    RRF --> RR[Diversity Reranker]
-    RR --> CB[Bounded Context Builder]
-    CB --> LLM[Generation Provider]
-    LLM --> R[Answer + Citations]
+    SS --> HS[Weighted hybrid scoring]
+    BM25 --> HS
+    HS --> RRF[Reciprocal Rank Fusion]
+    RRF --> RR[Diversity reranker]
+    RR --> CB[Bounded context]
+    CB --> LLM[Generation provider]
+    LLM --> R[Answer + citations]
 ```
 
-## Architectural principles
+The application layer depends on ports rather than infrastructure implementations. Persistence can be switched with configuration without changing the use cases.
 
-- **CQRS** separates index mutations from read-only RAG queries where the distinction is useful.
-- **Dependency Inversion** keeps application logic independent from OpenAI and storage implementations.
-- **Ports and Adapters** isolate embeddings, generation, vector storage, file extraction, chunking, fusion, and reranking.
-- **Strategy Pattern** makes ranking and chunking behavior replaceable without rewriting orchestration.
-- **Single Responsibility** keeps ingestion, retrieval, generation, document lifecycle, and transport concerns separated.
-- **Explicit composition** favors understandable behavior over framework magic.
-- **Untrusted retrieval context** is treated as data, never as instructions to the generation model.
+## Implemented capabilities
+
+- NestJS + TypeScript API with Swagger.
+- CQRS separation for ingestion/delete commands and RAG queries.
+- Recursive chunking with paragraph, sentence and whitespace boundaries.
+- OpenAI embedding and generation adapters.
+- In-memory vector store for deterministic local development/tests.
+- PostgreSQL + pgvector vector-store adapter.
+- Durable PostgreSQL document revision repository.
+- Stable document ids, SHA-256 content hashes, versioning and duplicate detection.
+- BM25 + semantic hybrid retrieval.
+- Configurable candidate pool and relevance threshold.
+- Reciprocal Rank Fusion.
+- Diversity reranking and near-duplicate evidence removal.
+- Exact-match metadata filtering.
+- Bounded generation context.
+- Source citations based on the exact chunks supplied to generation.
+- Plain text, Markdown, HTML and PDF ingestion.
+- Prompt-injection-aware generation boundary: retrieved content is untrusted data.
+- Strict DTO validation and upload validation.
+- Request correlation id and structured HTTP latency logs.
+- Configurable OpenAI timeout and retry policy.
+- Deterministic retrieval evaluation metrics: Recall@K, MRR and nDCG@K.
+- GitHub Actions quality gate for lint, tests, build and real pgvector persistence tests.
 
 ## Project structure
 
 ```text
 src/
-├── common/                 # Health and HTTP exception handling
-├── config/                 # Fail-fast environment validation
+├── common/
+│   ├── filters/              # Consistent HTTP error envelopes
+│   ├── health/               # Health endpoint
+│   └── observability/        # Request correlation and structured HTTP logs
+├── config/                   # Fail-fast environment validation
 ├── rag/
-│   ├── api/                # HTTP controllers, DTOs and multipart transport
-│   ├── application/        # Use cases, CQRS handlers and orchestration
-│   │   ├── commands/
-│   │   └── queries/
-│   ├── domain/             # Models, ports and strategy contracts
-│   ├── infrastructure/     # OpenAI, vector store, PDF/file extraction, BM25/RRF
+│   ├── api/                  # Controllers, DTOs and multipart transport
+│   ├── application/          # Use cases, CQRS handlers and orchestration
+│   ├── domain/               # Models, ports and strategy contracts
+│   ├── evaluation/           # Retrieval-quality metrics
+│   ├── infrastructure/       # OpenAI, pgvector, in-memory, PDF, BM25/RRF
 │   └── rag.module.ts
 ├── app.module.ts
 └── main.ts
+
+database/
+└── init.sql                  # pgvector schema and indexes
+
+docs/
+├── ARCHITECTURE.md
+├── DECISIONS.md
+├── EVALUATION.md
+├── PRODUCTION-READINESS.md
+└── RETRIEVAL.md
+
+examples/
+├── demo.sh                   # Reproducible ingest -> query -> citations flow
+└── evaluation/
+    └── retrieval-dataset.json
 ```
 
-## Ingestion pipeline
+## Ingestion lifecycle
 
-The ingestion path supports both inline content and uploaded documents.
-
-1. Receive content or a file.
-2. Detect/validate the source representation.
+1. Receive inline content or an uploaded document.
+2. Validate the source representation and upload type.
 3. Extract PDF text when required.
-4. Normalize text, Markdown, or HTML.
+4. Normalize text, Markdown or HTML.
 5. Compute a stable SHA-256 content hash.
 6. Detect duplicate revisions.
-7. Increment document version when content changes.
-8. Split content through a pluggable chunking strategy.
-9. Generate embeddings for every chunk.
-10. Replace previous chunks for the same stable document id.
-11. Persist new chunks through the `VectorStore` abstraction.
+7. Increment the document version when content changes.
+8. Split through the configured chunking strategy.
+9. Generate embeddings for chunks.
+10. Replace previous chunks for the stable document id.
+11. Persist chunks through the configured `VectorStore` adapter.
+12. Persist revision state through the configured revision repository.
 
-Supported upload types:
-
-- `text/plain`
-- `text/markdown`
-- `text/x-markdown`
-- `text/html`
-- `application/pdf`
-
-Uploads are memory-backed and limited to 10 MB. PDF files are signature-validated before text extraction.
-
-## Chunking
-
-The default `RecursiveChunkingStrategy` prefers meaningful boundaries instead of blindly cutting text:
-
-1. paragraph boundary
-2. sentence boundary
-3. whitespace boundary
-4. hard boundary as a final fallback
-
-Chunk size is constrained by both a character budget and an approximate token budget, with configurable overlap.
+When `RAG_PERSISTENCE=postgres`, chunks and revision state survive application restarts.
 
 ## Retrieval pipeline
 
-1. Embed the user question.
-2. Generate a configurable semantic candidate pool.
-3. Apply exact-match metadata filtering.
-4. Compute BM25 lexical relevance over the filtered corpus.
+1. Embed the question.
+2. Retrieve a configurable semantic candidate pool.
+3. Apply metadata filtering.
+4. Compute BM25 lexical relevance.
 5. Build weighted semantic + lexical scores.
-6. Apply a configurable score threshold.
-7. Fuse semantic and lexical rankings using Reciprocal Rank Fusion.
-8. Remove near-duplicate evidence and limit repeated chunks from the same document.
-9. Build a bounded generation context.
-10. Generate an answer only from the supplied evidence.
-11. Return the exact chunks used as citations.
+6. Apply the configured minimum score.
+7. Fuse rankings with Reciprocal Rank Fusion.
+8. Remove near-duplicate evidence and repeated chunks.
+9. Build a bounded context.
+10. Generate only from supplied evidence.
+11. Return the selected chunks as citations.
 
-## Hybrid retrieval
-
-The baseline scorer combines cosine similarity with normalized BM25 evidence:
+The weighted baseline is:
 
 ```text
 hybridScore = semanticScore * 0.72 + bm25Score * 0.28
 ```
 
-The two ranking signals are then fused with Reciprocal Rank Fusion (RRF). This avoids relying only on score calibration and rewards chunks that are consistently strong across independent rankings.
+## Persistence
 
-The scoring, fusion, and reranking stages live behind separate contracts so alternative approaches can be introduced without changing retrieval orchestration.
+Two persistence modes are available.
 
-## Diversity reranking
+### In-memory
 
-The default reranker performs a deterministic post-retrieval pass that:
+Useful for development, unit tests and understanding the mechanics. Data is process-local.
 
-- removes near-duplicate chunks using token-set similarity;
-- limits repeated evidence from the same document;
-- preserves the highest-ranked evidence first;
-- keeps the final context more diverse and useful for generation.
-
-The reranker is intentionally a separate stage so a cross-encoder or model-based implementation can replace it later.
-
-## Document lifecycle
-
-Documents can use a stable id. Re-ingesting identical normalized content is detected as a duplicate and does not generate embeddings again.
-
-When content changes:
-
-- the revision version increments;
-- previous chunks are removed;
-- the new revision is embedded and indexed;
-- `version` and `contentHash` are propagated into chunk metadata.
-
-Deleting a document removes both its indexed chunks and in-memory revision state.
-
-## CQRS
-
-```text
-POST /rag/documents
-POST /rag/documents/upload
-PUT  /rag/documents/:id
-DELETE /rag/documents/:id
-        ↓
-      Commands
-        ↓
-Application handlers
-        ↓
-   RagService
-
-POST /rag/query
-        ↓
-   AskRagQuery
-        ↓
-   AskRagHandler
-        ↓
-   RagService.query()
+```env
+RAG_PERSISTENCE=memory
 ```
 
-CQRS is used for operations whose read/write responsibilities genuinely differ. Internal components are not split into commands and queries merely for consistency.
+### PostgreSQL + pgvector
 
-## API
+Persists embeddings, chunk metadata and document revision state. The schema includes document-id and metadata indexes plus an HNSW cosine index for embeddings.
 
-Swagger UI:
-
-```text
-http://localhost:3000/docs
+```env
+RAG_PERSISTENCE=postgres
+DATABASE_URL=postgresql://rag:rag@postgres:5432/rag
+POSTGRES_POOL_MAX=10
 ```
 
-Health endpoint:
-
-```text
-GET /health
-```
-
-### Ingest inline content
-
-```bash
-curl -X POST http://localhost:3000/rag/documents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "architecture-notes",
-    "title": "RAG Architecture Notes",
-    "format": "markdown",
-    "content": "# Retrieval\nHybrid retrieval combines semantic and lexical evidence.",
-    "metadata": {
-      "category": "architecture"
-    }
-  }'
-```
-
-### Upload a file
-
-```bash
-curl -X POST http://localhost:3000/rag/documents/upload \
-  -F "file=@./architecture.pdf;type=application/pdf" \
-  -F "title=Architecture Notes" \
-  -F "id=architecture-notes" \
-  -F 'metadata={"category":"architecture"}'
-```
-
-### Reindex a stable document
-
-```bash
-curl -X PUT http://localhost:3000/rag/documents/architecture-notes \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "RAG Architecture Notes",
-    "format": "text",
-    "content": "Updated architecture documentation."
-  }'
-```
-
-### Delete a document
-
-```bash
-curl -X DELETE http://localhost:3000/rag/documents/architecture-notes
-```
-
-### Ask a question with metadata filters
-
-```bash
-curl -X POST http://localhost:3000/rag/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "How does hybrid retrieval work?",
-    "topK": 5,
-    "filters": {
-      "category": "architecture"
-    }
-  }'
-```
-
-Example response:
-
-```json
-{
-  "answer": "Hybrid retrieval combines semantic and lexical evidence. [S1]",
-  "citations": [
-    {
-      "documentId": "architecture-notes",
-      "chunkId": "architecture-notes:0",
-      "title": "RAG Architecture Notes",
-      "excerpt": "Hybrid retrieval combines semantic and lexical evidence...",
-      "score": 0.0325
-    }
-  ]
-}
-```
+Docker Compose starts the API and a pgvector-enabled PostgreSQL instance and initializes `database/init.sql`.
 
 ## Running locally
 
@@ -272,11 +185,74 @@ npm install
 npm run start:dev
 ```
 
-## Docker
+Swagger UI:
+
+```text
+http://localhost:3000/docs
+```
+
+Health:
+
+```text
+GET /health
+```
+
+## Docker with durable persistence
+
+Set `OPENAI_API_KEY` in `.env`, then:
 
 ```bash
 cp .env.example .env
+# change RAG_PERSISTENCE=postgres
 docker compose up --build
+```
+
+## Quick end-to-end demo
+
+With the API running, execute:
+
+```bash
+bash examples/demo.sh
+```
+
+The script performs a health check, ingests a small document, asks a grounded question using a metadata filter, returns the answer with the retrieved citations, and deletes the demo document. Set `BASE_URL` to point it at another environment:
+
+```bash
+BASE_URL=http://localhost:3000 bash examples/demo.sh
+```
+
+## API examples
+
+### Ingest content
+
+```bash
+curl -X POST http://localhost:3000/rag/documents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "architecture-notes",
+    "title": "RAG Architecture Notes",
+    "format": "markdown",
+    "content": "# Retrieval\nHybrid retrieval combines semantic and lexical evidence.",
+    "metadata": { "category": "architecture" }
+  }'
+```
+
+### Query
+
+```bash
+curl -X POST http://localhost:3000/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "How does hybrid retrieval work?",
+    "topK": 5,
+    "filters": { "category": "architecture" }
+  }'
+```
+
+### Delete
+
+```bash
+curl -X DELETE http://localhost:3000/rag/documents/architecture-notes
 ```
 
 ## Configuration
@@ -286,101 +262,87 @@ PORT=3000
 OPENAI_API_KEY=
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_CHAT_MODEL=gpt-4.1-mini
+OPENAI_TIMEOUT_MS=30000
+OPENAI_MAX_RETRIES=2
+
+RAG_PERSISTENCE=memory
+DATABASE_URL=postgresql://rag:rag@postgres:5432/rag
+POSTGRES_POOL_MAX=10
+
 RAG_CHUNK_SIZE=900
 RAG_CHUNK_OVERLAP=150
-RAG_CHUNK_MAX_TOKENS=300
+RAG_CHUNK_MAX_TOKENS=220
 RAG_TOP_K=6
 RAG_MAX_CONTEXT_CHARS=12000
 RAG_CANDIDATE_MULTIPLIER=5
 RAG_MIN_SCORE=0
 ```
 
-Critical configuration is validated before application startup.
+Critical configuration is validated before startup.
 
-## Testing and quality
+## Evaluation
 
-The GitHub Actions quality gate runs:
+Retrieval-quality helpers implement:
 
-```text
-npm install
-npm run lint
-npm test -- --runInBand
-npm run build
-```
+- Recall@K
+- Mean Reciprocal Rank (MRR)
+- nDCG@K
 
-Useful local commands:
+The metrics are deterministic, unit-tested and provider-independent. See `docs/EVALUATION.md` and `examples/evaluation/retrieval-dataset.json` for the evaluation workflow and dataset format.
+
+Generation evaluation remains intentionally separate so retrieval metrics are not conflated with LLM judging. A production dataset should additionally measure groundedness, answer relevance, citation correctness and unsupported claims.
+
+## Observability and provider resilience
+
+Every HTTP request receives or propagates an `x-request-id`. Structured request logs include request id, method, path, HTTP status and duration.
+
+OpenAI clients use configurable request timeout and retry limits. Provider failures are translated into explicit domain errors rather than leaking SDK-specific exceptions through the application layer.
+
+## Testing and CI
+
+Local quality commands:
 
 ```bash
 npm run lint
-npm test
+npm test -- --runInBand
 npm run test:cov
 npm run build
 ```
 
-Tests cover chunking, context construction, hybrid scoring, RRF, diversity reranking, metadata filtering, vector-store behavior, document revision/deduplication, end-to-end RAG orchestration, and uploaded-file validation.
+The GitHub Actions pipeline runs:
+
+1. dependency installation;
+2. lint;
+3. unit and integration tests;
+4. PostgreSQL/pgvector persistence tests against a real service container;
+5. build.
+
+The integration suite verifies pgvector upsert/search/delete behavior and durable document revision state.
 
 ## Security boundaries
 
-Retrieved documents are treated as untrusted data. The generation system prompt explicitly instructs the model to ignore instructions embedded inside retrieved content and to answer only from supplied evidence.
+Retrieved documents are treated as untrusted data. The generation system prompt instructs the model to ignore instructions embedded in retrieved content and answer only from supplied evidence.
 
-The API also applies:
+The API also applies strict DTO validation, unknown-field rejection, upload limits, MIME validation, PDF signature validation, bounded generation context and consistent error envelopes.
 
-- strict DTO validation;
-- unknown-field rejection;
-- upload size limits;
-- MIME validation;
-- PDF signature validation;
-- bounded generation context;
-- consistent exception envelopes;
-- no secrets committed to the repository.
+## Production boundary
 
-## Design decisions
+This repository demonstrates the core engineering decisions behind a production-capable RAG service, but it is not presented as a complete multi-tenant SaaS platform.
 
-Detailed rationale is documented in:
+Deliberately out of scope for this portfolio repository:
 
-- `docs/ARCHITECTURE.md`
-- `docs/DECISIONS.md`
-- `docs/PRODUCTION-READINESS.md`
+- authentication/authorization and tenant isolation;
+- queue-backed asynchronous ingestion at large scale;
+- distributed tracing exporter and metrics backend;
+- circuit breaking across multiple application replicas;
+- PII redaction and compliance-specific audit storage;
+- automated LLM-as-a-judge generation scoring.
 
-### Why no LangChain or LlamaIndex?
-
-The objective is to expose RAG mechanics rather than framework configuration. Important abstractions are implemented directly so their behavior, trade-offs, and failure modes remain visible.
-
-### Why an in-memory vector store first?
-
-The in-memory adapter keeps cosine similarity and index lifecycle explicit and makes tests deterministic. Application code depends on `VectorStore`, so persistent adapters can replace it without changing use cases.
-
-### Why BM25 plus semantic retrieval?
-
-Semantic similarity is strong at meaning, while lexical retrieval preserves exact identifiers, codes, names, acronyms, and domain terminology. Combining them provides a stronger baseline than using either signal alone.
-
-### Why RRF after weighted scoring?
-
-Weighted scores are useful for explicit relevance thresholds and diagnostics. RRF adds a rank-based fusion step that reduces sensitivity to the different numerical scales of semantic and lexical signals.
-
-### Why a separate reranking stage?
-
-Candidate generation, fusion, and final evidence selection solve different problems. Keeping reranking separate allows deterministic diversity today and model-based reranking later without changing retrieval orchestration.
-
-## Current production boundary
-
-This repository is intentionally production-minded rather than presented as a finished production platform. The current vector store and revision registry are in-memory and therefore process-local and non-durable.
-
-High-value next extensions include:
-
-- PostgreSQL + pgvector persistence;
-- durable document/revision state;
-- database-level metadata filtering;
-- retrieval evaluation datasets and metrics;
-- groundedness and citation evaluation;
-- OpenTelemetry traces and Prometheus metrics;
-- provider retries, backoff and circuit breakers;
-- asynchronous ingestion for large document sets;
-- authentication, authorization and tenant isolation.
+Those concerns are documented in `docs/PRODUCTION-READINESS.md` and can be added without replacing the application-layer contracts.
 
 ## Engineering philosophy
 
-The implementation favors explicit behavior, small replaceable components, dependency inversion, deterministic boundaries, and testability. Patterns are introduced only where they solve a concrete design problem; the objective is not to maximize abstraction, but to keep the system understandable as it evolves.
+The implementation favors explicit behavior, small replaceable components, dependency inversion, deterministic boundaries and testability. Patterns are introduced only where they solve a concrete problem; the objective is not to maximize abstraction, but to make the system understandable and defensible in a technical review.
 
 ## License
 

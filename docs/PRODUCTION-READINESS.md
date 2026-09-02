@@ -1,50 +1,67 @@
 # Production Readiness Notes
 
-This repository keeps the core retrieval mechanics explicit, while documenting the changes required to operate the same architecture under production load.
+This repository keeps the core RAG mechanics explicit while demonstrating the infrastructure boundaries required to operate the same architecture under production constraints.
 
-## Already implemented
+## Implemented
 
-- CQRS separation between ingestion and queries.
-- Provider ports for embeddings, generation, vector persistence, and ranking.
+- CQRS separation between ingestion mutations and RAG queries.
+- Provider ports for embeddings, generation, vector persistence and revision persistence.
+- In-memory persistence for deterministic development.
+- PostgreSQL + pgvector persistence for chunks, embeddings and document revisions.
+- HNSW cosine index plus document-id and JSONB metadata indexes.
+- Real pgvector integration tests in GitHub Actions.
 - BM25 + semantic hybrid retrieval.
+- Reciprocal Rank Fusion and diversity reranking.
 - Exact-match metadata filtering.
-- Bounded generation context.
-- Source citations derived from the exact selected chunks.
+- Bounded generation context and exact source citations.
 - Prompt-injection-aware generation instructions.
 - Global request validation and consistent HTTP error responses.
 - Health endpoint.
-- Unit tests for chunking, vector similarity, context construction, and hybrid scoring.
-- CI quality gate covering lint, tests, and build.
+- Request correlation id and structured HTTP latency logs.
+- Configurable OpenAI timeout and retry limits.
+- Deterministic retrieval evaluation metrics: Recall@K, MRR and nDCG@K.
+- CI quality gate covering lint, tests, pgvector integration and build.
 
-## Production adapters
+## Persistence boundary
 
-The current in-memory vector store is intentionally transparent. A production deployment should replace it with a durable adapter such as PostgreSQL/pgvector or Qdrant while preserving the `VectorStore` port.
+`RAG_PERSISTENCE=memory` keeps state local to the process. `RAG_PERSISTENCE=postgres` uses PostgreSQL/pgvector without changing application use cases.
 
-A production adapter should support:
+A larger production deployment should additionally consider:
 
-- transactional or idempotent upserts;
-- metadata indexes;
-- tenant-aware filtering;
-- batched embedding ingestion;
-- deletion and re-indexing by document id;
-- schema/version metadata for embedding migrations.
+- explicit database migrations instead of only bootstrap SQL;
+- transactional/staged replacement for highly concurrent reindexing;
+- tenant-aware database policies and indexes;
+- embedding schema/version metadata for model migrations;
+- batched ingestion and connection-pool tuning based on load testing.
 
 ## Reliability
 
-Recommended extensions:
+Implemented baseline:
 
-- timeout and retry policies around external model providers;
-- exponential backoff with jitter;
-- circuit breaking for repeated upstream failures;
+- bounded provider request timeout;
+- configurable provider retries;
+- explicit provider-error translation;
+- bounded upload and generation context sizes.
+
+Deployment-specific extensions:
+
+- circuit breaking when repeated upstream failures justify it;
 - bulkheading/concurrency limits for ingestion;
-- idempotency keys for ingestion requests;
-- dead-letter handling for asynchronous ingestion pipelines.
+- idempotency keys for externally retried ingestion requests;
+- dead-letter handling for queue-backed ingestion.
+
+A circuit breaker is intentionally not hard-coded here because its useful state scope depends on deployment topology, replica count and the chosen resilience layer.
 
 ## Observability
 
-Recommended telemetry:
+Implemented baseline:
 
 - request correlation id;
+- structured HTTP request log;
+- HTTP status and request duration.
+
+Useful production telemetry to export through the platform-standard stack:
+
 - retrieval latency;
 - embedding latency;
 - generation latency;
@@ -53,54 +70,65 @@ Recommended telemetry:
 - token usage and estimated model cost;
 - zero-result query rate;
 - upstream provider error rate;
-- structured logs with document and tenant identifiers where safe.
+- database pool saturation;
+- document/tenant identifiers where safe.
+
+OpenTelemetry and Prometheus exporters are deliberately left deployment-specific rather than adding an unused telemetry stack to the portfolio repository.
 
 ## Retrieval quality
 
-A production evaluation suite should measure retrieval and generation separately.
+Implemented deterministic metrics:
 
-Retrieval metrics:
+- Recall@K;
+- MRR;
+- nDCG@K.
 
-- Recall@K
-- Precision@K
-- MRR
-- nDCG
+The evaluation helpers are provider-independent and unit tested. A versioned representative dataset should be expanded as the target corpus becomes known.
 
-Generation metrics:
+Generation evaluation should remain separate and measure at least:
 
 - groundedness;
 - answer relevance;
 - citation correctness;
 - unsupported-claim rate.
 
-Evaluation datasets should be versioned alongside retrieval configuration so ranking changes can be compared before deployment.
-
 ## Security
 
-Production deployments should add:
+Implemented boundaries include:
+
+- strict DTO validation;
+- unknown-field rejection;
+- upload size limits;
+- MIME validation;
+- PDF signature validation;
+- prompt-injection-aware retrieved-context handling;
+- bounded context construction;
+- no secrets committed to the repository.
+
+Product-specific production deployments should add:
 
 - authentication and authorization;
 - tenant isolation;
 - rate limiting;
-- request-size limits;
-- document type and MIME validation;
-- secrets management outside environment files;
+- secrets management through the deployment platform;
 - PII classification/redaction when required;
 - audit logs for ingestion and destructive operations;
-- explicit trust boundaries for retrieved content.
-
-Retrieved documents must always be treated as untrusted data. They must never be allowed to redefine system behavior or authorize tool execution.
+- malware/quarantine workflows for higher-risk document sources.
 
 ## Scaling path
 
-A practical evolution path is:
+The current architecture supports an incremental path:
 
-1. synchronous ingestion for development;
-2. durable vector adapter;
+1. synchronous ingestion for development/small workloads;
+2. PostgreSQL + pgvector durable persistence;
 3. queue-backed asynchronous ingestion;
 4. batched embedding workers;
 5. horizontal query API scaling;
-6. cached embeddings/query results where appropriate;
+6. caching where evaluation shows value;
 7. dedicated reranking models for higher-value workloads.
 
-The application layer should remain unchanged as these infrastructure adapters evolve.
+The application layer should remain stable as these infrastructure adapters evolve.
+
+## Portfolio boundary
+
+This repository is intentionally production-minded, not marketed as a finished multi-tenant SaaS product. It now demonstrates the main engineering concerns useful in a technical review: architecture boundaries, durable vector persistence, revision lifecycle, retrieval quality measurement, CI integration testing, observability basics, provider failure controls and explicit security boundaries.

@@ -1,0 +1,12 @@
+[
+  {
+    "question": "How does hybrid retrieval combine evidence?",
+    "relevantDocumentIds": ["architecture-notes"],
+    "retrievedDocumentIds": ["architecture-notes", "finance-notes"]
+  },
+  {
+    "question": "What is the document revision strategy?",
+    "relevantDocumentIds": ["architecture-notes"],
+    "retrievedDocumentIds": ["finance-notes", "architecture-notes"]
+  }
+]

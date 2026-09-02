@@ -13,12 +13,18 @@ export class RagController {
     private readonly queryBus: QueryBus,
   ) {}
 
-  /** Indexes a source document by chunking, embedding, and storing its vector representation. */
+  /** Indexes a source document by normalizing, chunking, embedding, and storing it. */
   @Post('documents')
   @ApiOperation({ summary: 'Ingest and index a document' })
   ingest(@Body() dto: IngestDocumentDto) {
     return this.commandBus.execute(
-      new IngestDocumentCommand(dto.title, dto.content, dto.metadata, dto.id),
+      new IngestDocumentCommand(
+        dto.title,
+        dto.content,
+        dto.metadata,
+        dto.id,
+        dto.format ?? 'text',
+      ),
     );
   }
 

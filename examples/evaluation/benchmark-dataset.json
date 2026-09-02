@@ -1,0 +1,18 @@
+{
+  "version": "v1",
+  "documents": [
+    {"id":"hybrid-search","text":"Hybrid retrieval combines dense semantic similarity with BM25 lexical evidence. Reciprocal Rank Fusion merges independent rankings."},
+    {"id":"revisions","text":"Document revisions use a stable document id and a SHA-256 content hash. Changed content increments the revision version before reindexing."},
+    {"id":"security","text":"Retrieved context is untrusted data. Prompt injection instructions inside documents must not override system instructions."},
+    {"id":"observability","text":"HTTP requests propagate a request id and structured logs record method path status code and latency."},
+    {"id":"persistence","text":"PostgreSQL with pgvector stores embeddings and chunk metadata. HNSW cosine indexes accelerate semantic nearest-neighbor search."},
+    {"id":"finance","text":"Quarterly revenue increased while operating expenses remained stable. This document is unrelated to retrieval architecture."}
+  ],
+  "cases": [
+    {"question":"How are semantic and lexical retrieval combined?","relevantDocumentIds":["hybrid-search"]},
+    {"question":"How do document revisions detect changed content?","relevantDocumentIds":["revisions"]},
+    {"question":"How should prompt injection in retrieved documents be handled?","relevantDocumentIds":["security"]},
+    {"question":"What is logged for HTTP observability?","relevantDocumentIds":["observability"]},
+    {"question":"Which persistence engine supports vector search and HNSW?","relevantDocumentIds":["persistence"]}
+  ]
+}

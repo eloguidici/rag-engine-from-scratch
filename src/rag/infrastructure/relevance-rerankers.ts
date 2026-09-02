@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ExternalProviderError } from '../../common/errors/external-provider.error';
+import { ExternalProviderError } from '../domain/errors';
 import { SearchHit } from '../domain/models';
 import { RelevanceReranker } from '../domain/relevance-reranker';
 
 @Injectable()
 export class NoOpRelevanceReranker implements RelevanceReranker {
-  async rerank(_query: string, hits: SearchHit[], topK: number): Promise<SearchHit[]> {
-    return hits.slice(0, Math.max(topK, hits.length));
+  async rerank(_query: string, hits: SearchHit[], _topK: number): Promise<SearchHit[]> {
+    return hits;
   }
 }
 
@@ -24,11 +24,14 @@ export class CohereRelevanceReranker implements RelevanceReranker {
 
     const apiKey = this.config.get<string>('COHERE_API_KEY')?.trim();
     if (!apiKey) {
-      throw new ExternalProviderError('Cohere reranker is enabled but COHERE_API_KEY is missing');
+      throw new ExternalProviderError(
+        'cohere-rerank',
+        'Cohere reranker is enabled but COHERE_API_KEY is missing',
+      );
     }
 
     const model = this.config.get<string>('COHERE_RERANK_MODEL') ?? 'rerank-v3.5';
-    const timeoutMs = Number(this.config.get<string>('RAG_RERANK_TIMEOUT_MS') ?? 10000);
+    const timeoutMs = Number(this.config.get<string>('RAG_RERANK_TIMEOUT_MS') ?? 10_000);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -63,8 +66,11 @@ export class CohereRelevanceReranker implements RelevanceReranker {
         })
         .filter((hit): hit is SearchHit => Boolean(hit));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      throw new ExternalProviderError(`Cohere reranking failed: ${message}`);
+      throw new ExternalProviderError(
+        'cohere-rerank',
+        'Semantic reranking failed',
+        error,
+      );
     } finally {
       clearTimeout(timeout);
     }
